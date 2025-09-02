@@ -1,0 +1,233 @@
+#include "minecraft/src/common/world/item/ItemStackBase.hpp"
+#include "minecraft/src/common/world/item/Item.hpp"
+#include <amethyst/Memory.hpp>
+#include "registry/ItemRegistryManager.hpp"
+#include "registry/ItemRegistry.hpp"
+#include "minecraft/src-deps/core/string/StringHash.hpp"
+
+//std::string ItemStackBase::getRawNameId() const
+//{
+//    using function = decltype(&ItemStackBase::getRawNameId);
+//
+//    // known outdated for 1.20.71
+//    static auto func = std::bit_cast<function>(
+//        SigScan("48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 48 89 54 24 ? 57 48 83 EC ? 48 8B FA 48 8B E9 33 F6"));
+//
+//    return (this->*func)();
+//}
+
+void ItemStackBase::_loadItem(const CompoundTag* a1) {
+    using function = decltype(&ItemStackBase::_loadItem);
+
+    static auto func = std::bit_cast<function>(
+        SigScan("48 89 5C 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 ? ? ? ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 4C 8B EA 48 89 8D")
+    );
+
+    (this->*func)(a1);
+}
+
+void ItemStackBase::reinit(const Item& item, int count, int auxValue)
+{
+    using function = void(ItemStackBase::*)(const Item&, int, int);
+    auto func = std::bit_cast<function>(vtable[1]);
+    (this->*func)(item, count, auxValue);
+}
+
+void ItemStackBase::reinit(const BlockLegacy& block, int count)
+{
+    using function = void (ItemStackBase::*)(const BlockLegacy&, int);
+    auto func = std::bit_cast<function>(vtable[2]);
+    (this->*func)(block, count);
+}
+
+void ItemStackBase::reinit(std::string_view name, int count, int auxValue)
+{
+    using function = void (ItemStackBase::*)(std::string_view, int, int);
+    auto func = std::bit_cast<function>(vtable[3]);
+    (this->*func)(name, count, auxValue);
+}
+
+void ItemStackBase::setNull(std::optional<std::string> reason)
+{
+    using function = void(ItemStackBase::*)(std::optional<std::string>);
+    auto func = std::bit_cast<function>(vtable[4]);
+    (this->*func)(reason);
+}
+
+std::string ItemStackBase::toString() const
+{
+    using function = std::string(ItemStackBase::*)() const;
+    auto func = std::bit_cast<function>(vtable[5]);
+    return (this->*func)();
+}
+
+std::string ItemStackBase::toDebugString() const
+{
+    using function = std::string(ItemStackBase::*)() const;
+    auto func = std::bit_cast<function>(vtable[6]);
+    return (this->*func)();
+}
+
+ItemStackBase::ItemStackBase() {
+    static uintptr_t itemStackBaseVtable = AddressFromLeaInstruction(
+        SigScan("4C 8D 35 ?? ?? ?? ?? 4C 89 74 24 ?? 48 89 74 24 ?? 48 89 74 24")
+    );
+
+    this->vtable = reinterpret_cast<uintptr_t**>(itemStackBaseVtable);
+    this->mUserData = nullptr;
+    this->mBlock = nullptr;
+    this->mAuxValue = 0b1000000000000000;
+    this->mCount = 0;
+    this->mValid = false;
+    this->mShowPickup = true;
+    this->mCanPlaceOnHash = 0;
+    this->mCanDestroyHash = 0;
+    this->mChargedItem = nullptr;
+    this->setNull(std::nullopt);
+}
+
+ItemStackBase::ItemStackBase(const ItemStackBase& other) :
+    mCount(other.mCount),
+    mAuxValue(other.mAuxValue),
+    mItem(other.mItem),
+    mBlock(other.mBlock),
+    mValid(other.mValid),
+    mPickupTime(other.mPickupTime)
+{
+    static uintptr_t itemStackBaseVtable = AddressFromLeaInstruction(
+        SigScan("4C 8D 35 ?? ?? ?? ?? 4C 89 74 24 ?? 48 89 74 24 ?? 48 89 74 24"));
+
+    this->vtable = reinterpret_cast<uintptr_t**>(itemStackBaseVtable);
+    this->mUserData = nullptr;
+    
+    if (other.mUserData != nullptr) {
+        std::unique_ptr<CompoundTag> clonedData = other.mUserData->clone();
+        setUserData(std::move(clonedData));
+    }
+
+    /*std::unique_ptr<CompoundTag> clonedData = nullptr;
+
+    if (rhs.mUserData) {
+        clonedData = rhs.mUserData->clone();
+    }*/
+
+    // setUserData(clonedData);
+    // _cloneComponents(rhs)
+}
+
+ItemStackBase::~ItemStackBase() = default;
+
+// 1.20.51.1 Reimplementation - Incomplete
+ItemStackBase &ItemStackBase::operator=(const ItemStackBase& rhs) {
+    mCount = rhs.mCount;
+    mAuxValue = rhs.mAuxValue;
+    mItem = rhs.mItem;
+    mBlock = rhs.mBlock;
+    mValid = rhs.mValid;
+    mPickupTime = rhs.mPickupTime;
+    mUserData = nullptr;
+
+    /*std::unique_ptr<CompoundTag> clonedData = nullptr;
+
+    if (rhs.mUserData) {
+        clonedData = rhs.mUserData->clone();
+    }*/
+
+    if (rhs.mUserData) {
+        std::unique_ptr<CompoundTag> clonedData = rhs.mUserData->clone();
+        setUserData(std::move(clonedData));
+    }
+
+    // setUserData(clonedData);
+    // _cloneComponents(rhs)
+
+    return *this;
+}
+
+bool ItemStackBase::isNull() const {
+    if (!mValid) return true;
+    Item* item = mItem.get();
+
+    if (!item || item->mFullName != HashedString("minecraft:air")) {
+        if (mCount != 0 || mBlock != nullptr || mAuxValue != 0) return false;
+        if (item || mUserData != 0 || mCanDestroyHash != 0 || mCanPlaceOnHash != 0) return false;
+    }
+
+    return true;
+}
+
+void ItemStackBase::setUserData(std::unique_ptr<CompoundTag> userData)
+{
+    using function = decltype(&ItemStackBase::setUserData);
+    static auto func = std::bit_cast<function>(SigScan("48 89 5C 24 ? 48 89 74 24 ? 57 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 48 8B FA 48 8B F1 48 89 94 24 ? ? ? ? 48 8D 59"));
+    return (this->*func)(std::move(userData));
+}
+
+bool ItemStackBase::isLiquidClipItem() const
+{
+    return mItem && mItem->isLiquidClipItem();
+}
+
+bool ItemStackBase::shouldInteractionWithBlockBypassLiquid(const Block& block) const
+{
+    return mItem && mItem->shouldInteractionWithBlockBypassLiquid(block);
+}
+
+bool ItemStackBase::isInstance(const HashedString& itemName, bool useItemLookup) const
+{
+    if (useItemLookup) {
+        return this->_isInstance(itemName.getString());
+    }
+    else {
+        if (!mItem) return false;
+        return mItem->mFullName == itemName;
+    }
+}
+
+bool ItemStackBase::_isInstance(std::string_view itemName) const
+{
+    if (!mItem) return false;
+    Assert(false, "Too lazy to implement this, if needed write impl here");
+}
+
+
+
+const Item* ItemStackBase::getItem() const {
+    return mItem.get();
+}
+
+ItemStackBase::operator bool() const
+{
+    return mValid && mItem && !isNull() && mCount > 0;
+}
+
+bool ItemStackBase::isBlock() const
+{
+    return mItem && mItem->mLegacyBlock;
+}
+
+WeakPtr<BlockLegacy> ItemStackBase::getLegacyBlock() const
+{
+    if (mItem && mItem->mLegacyBlock) {
+        return mItem->mLegacyBlock;
+    }
+
+    return WeakPtr<BlockLegacy>();
+}
+
+bool ItemStackBase::isOffhandItem() const
+{
+    if (!mItem) return false;
+    return mItem->mAllowOffhand;
+}
+
+bool ItemStackBase::hasTag(const HashedString& tag) const
+{
+    return mItem && mItem->hasTag(tag);
+}
+
+UseAnim ItemStackBase::getUseAnimation() const
+{
+    if (!mItem) return UseAnim::None;
+    else return mItem->getUseAnim();
+}
