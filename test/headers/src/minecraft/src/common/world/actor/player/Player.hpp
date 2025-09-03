@@ -16,9 +16,8 @@ class LayeredAbilities;
 
 #pragma pack(push, 1)
 class Player : public Mob {
-    uintptr_t** vtable;
 public:
-    /* this + 1512 */ std::byte padding1512[368];
+    /* this + 1512 */ std::byte padding1512[376];
     /* this + 1888 */ PlayerInventory* playerInventory;
     /* this + 1896 */ std::byte padding1896[1400];
     /* this + 3288 */ ItemGroup mCursorSelectedItemGroup;

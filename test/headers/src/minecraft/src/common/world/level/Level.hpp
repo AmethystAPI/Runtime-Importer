@@ -10,7 +10,7 @@
 
 // client code included on server?
 #include <minecraft/src-client/common/client/renderer/texture/BaseLightTextureImageBuilder.hpp>
-
+//
 class PacketSender;
 
 class Level : public ILevel, public BlockSourceListener, public IWorldRegistriesProvider {

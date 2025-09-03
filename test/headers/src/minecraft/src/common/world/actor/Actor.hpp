@@ -603,4 +603,4 @@ public:
 #pragma pack(pop)   
 
 // 1.21.0.3
-//static_assert(sizeof(Actor) == 1096);
+static_assert(sizeof(Actor) == 1096);
