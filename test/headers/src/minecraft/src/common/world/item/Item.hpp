@@ -20,7 +20,7 @@
 
 // Auto-generated: Unknown complete types
 enum ItemColor {};
-struct ActorDefinitionIdentifier {};
+struct ActorDefinitionIdentifier;
 enum ItemUseMethod {};
 enum InHandUpdateType {};
 enum ActorLocation {};

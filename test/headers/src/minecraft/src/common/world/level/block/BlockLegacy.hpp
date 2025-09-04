@@ -5,6 +5,8 @@
 #include <vector>
 #include <memory>
 
+#include <minecraft/src/common/world/Direction.hpp>
+#include <minecraft/src/common/world/item/FertilizerType.hpp>
 #include <minecraft/src-deps/core/math/Color.hpp>
 #include <minecraft/src-deps/core/string/StringHash.hpp>
 #include <minecraft/src-deps/core/utility/optional_ref.hpp>
@@ -28,10 +30,6 @@
 
 // Auto-generated: Unknown complete types
 enum BlockSupportType {};
-namespace Direction {
-enum Type {};
-}
-enum FertilizerType {};
 enum Flip {};
 
 // Auto-generated: Forward declarations

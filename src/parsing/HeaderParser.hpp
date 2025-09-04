@@ -27,6 +27,7 @@ struct FunctionVisitingData {
 
 class HeaderParser {
 public:
+	fs::path MainDirectory;
 	CXIndex mIndex;
 	CXTranslationUnit mTranslationUnit;
 	std::vector<fs::path> mPathFilters;
@@ -35,6 +36,7 @@ public:
 	std::unordered_map<std::string, std::string> mClassNameCache;
 	std::unordered_map<std::string, std::string> mClassFullNameCache;
 	std::unordered_map<std::string, std::string> mFunctionMangledNameCache;
+	std::unordered_map<std::string, std::string> mFunctionShortNameCache;
 	std::unordered_map<std::string, std::string> mCommentsCache;
 	std::unordered_map<std::string, fs::path> mHeaderPathCache;
 	std::unordered_map<std::string, fs::path> mHeaderRelativePathCache;
@@ -43,13 +45,14 @@ public:
 	std::unordered_map<std::string, ClassInfo> mClasses;
 	std::unordered_map<std::string, FunctionInfo> mFunctions;
 
-	HeaderParser(const std::string& file, const std::vector<const char*>& arguments, unsigned int flags, const ParsingData& data, const std::vector<fs::path>& pathFilters = {});
+	HeaderParser(const fs::path& mainDir, const std::string& file, const std::vector<const char*>& arguments, unsigned int flags, const ParsingData& data, const std::vector<fs::path>& pathFilters = {});
 	~HeaderParser();
 
 	void VisitAll();
 	std::string GetClassName(CXCursor cursor);
 	std::string GetClassFullName(CXCursor cursor);
 	std::string GetFunctionMangledName(CXCursor cursor);
+	std::string GetFunctionShortName(CXCursor cursor);
 	std::optional<fs::path> GetFilePathForCursor(CXCursor cursor);
 	std::optional<std::string> GetCommentForCursor(CXCursor cursor);
 	bool IsOnFilter(const fs::path& file);
@@ -57,7 +60,6 @@ public:
 	FunctionInfo* GetFunctionInfoByMangledName(const std::string& mangledName);
 	bool HasClass(const std::string& className);
 	bool HasFunction(const std::string& mangledName);
-	
 
 	void SortAllClassesTopologically();
 	void SortAllFunctionsTopologically();
@@ -67,8 +69,8 @@ public:
 	void ResolveBaseClassVirtualFunctionsIndex();
 	void ResolveNewVirtualFunctionIndices();
 	void ResolveAllFunctionOverridesIndices();
-
-	void PrintTranslationUnitDiagnostics();
+	void PrintTranslationUnitErrors();
+	void DoStuff();
 
 private:
 	CXChildVisitResult VisitClass(CXCursor cursor, const std::string& className, const fs::path& file, ClassVisitingData& visitingData);

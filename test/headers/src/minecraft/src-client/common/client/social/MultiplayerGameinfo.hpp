@@ -67,7 +67,7 @@ public:
     std::byte padding3[8];
     std::byte padding4[32];
     std::string mOwnerPlayFabId;
-    std::string mWorldName;
+    std::string mWorldName_1;
     int16_t mProtocol;
     int16_t mMaxMemberCount;
     int16_t mMemberCount;

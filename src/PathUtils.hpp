@@ -12,4 +12,17 @@ public:
 	static bool CheapIsFrom(const fs::path& path, const fs::path& directory) {
 		return path.string().rfind(directory.string(), 0) == 0;
 	}
+
+	static std::string MakeRelative(const fs::path& bbase, const fs::path& bfull) {
+		fs::path base = fs::absolute(bbase).lexically_normal();
+		fs::path full = fs::absolute(bfull).lexically_normal();
+		auto baseStr = base.generic_string();
+		auto fullStr = full.generic_string();
+
+		if (fullStr.compare(0, baseStr.size(), baseStr) == 0 &&
+			(fullStr.size() == baseStr.size() || fullStr[baseStr.size()] == '/')) {
+			return fullStr.substr(baseStr.size() + 1);
+		}
+		return fullStr;
+	}
 };

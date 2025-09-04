@@ -1,3 +1,4 @@
+/// @symgen
 #pragma once
 #include <gsl/gsl>
 #include <minecraft/src-deps/core/utility/NonOwnerPointer.hpp>
@@ -13,13 +14,13 @@
 #include <minecraft/src-deps/shared_types/legacy/LevelSoundEvent.hpp>
 #include <minecraft/src/common/world/level/GameType.hpp>
 #include <minecraft/src/common/world/item/registry/ItemRegistryRef.hpp>
+#include <minecraft/src-client/common/client/social/MultiplayerGameinfo.hpp>
 
 // Auto-generated: Forward declarations
 namespace PlayerCapabilities { struct ISharedController; }
 namespace PositionTrackingDB { class PositionTrackingDBClient; }
 namespace cg { class ImageBuffer; }
 namespace mce {class UUID; class Color; }
-namespace Social { class GamePublishSetting; }
 class EntityContext;
 struct ActorUniqueID;
 class LevelSettings;
@@ -119,6 +120,7 @@ class TickingAreaList;
 enum class ParticleType : int {};
 class BlockPalette;
 
+/// @vPointer {0xDEADBEEF, this}
 class ILevel : public Bedrock::EnableNonOwnerReferences {
 public:
     /**@vIndex {0}*/

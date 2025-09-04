@@ -24,7 +24,6 @@ target("symgen")
         "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/ucrt",
         "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/shared",
         "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/um",
-    
         "-I$(projectdir)/test/headers/src",
         "-I$(projectdir)/test/headers/include",
         "-fms-extensions",

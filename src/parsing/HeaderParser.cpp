@@ -4,7 +4,8 @@
 #include <iostream>
 #include <functional>
 
-HeaderParser::HeaderParser(const std::string& file, const std::vector<const char*>& arguments, unsigned int flags, const ParsingData& data, const std::vector<fs::path>& pathFilters) :
+HeaderParser::HeaderParser(const fs::path& mainDir, const std::string& file, const std::vector<const char*>& arguments, unsigned int flags, const ParsingData& data, const std::vector<fs::path>& pathFilters) :
+	MainDirectory(mainDir),
 	mPathFilters(pathFilters),
 	mParsingData(data)
 {
@@ -45,11 +46,9 @@ void HeaderParser::VisitAll()
 			CXCursorKind kind = clang_getCursorKind(c);
 			auto filePath = parser.GetFilePathForCursor(c);
 
-			// Skip cursors that are not in a file or not on the filter
 			if (!filePath.has_value() || !parser.IsOnFilter(*filePath))
 				return CXChildVisit_Continue;
 
-			// Match classes and structs
 			if (kind == CXCursor_ClassDecl || kind == CXCursor_StructDecl) {
 				auto className = parser.GetClassFullName(c);
 				if (parser.mClasses.find(className) != parser.mClasses.end()) {
@@ -119,6 +118,21 @@ std::string HeaderParser::GetFunctionMangledName(CXCursor cursor)
 	}
 }
 
+std::string HeaderParser::GetFunctionShortName(CXCursor cursor)
+{
+	auto usr = GetCursorUSR(cursor);
+	if (mFunctionShortNameCache.find(usr) != mFunctionShortNameCache.end()) {
+		return mFunctionShortNameCache[usr];
+	}
+	else {
+		auto shortName = clang_getCursorSpelling(cursor);
+		std::string shortNameStr = clang_getCString(shortName);
+		clang_disposeString(shortName);
+		mFunctionShortNameCache[usr] = shortNameStr;
+		return shortNameStr;
+	}
+}
+
 std::optional<fs::path> HeaderParser::GetFilePathForCursor(CXCursor cursor)
 {
 	auto usr = GetCursorUSR(cursor);
@@ -135,7 +149,8 @@ std::optional<fs::path> HeaderParser::GetFilePathForCursor(CXCursor cursor)
 		std::string fileName = clang_getCString(cxFileName);
 		clang_disposeString(cxFileName);
 		auto filePath = fs::path(fileName).generic_string();
-		mHeaderPathCache[usr] = filePath;
+		auto rel = PathUtils::MakeRelative(MainDirectory, filePath);
+		mHeaderPathCache[usr] = rel;
 		return filePath;
 	}
 }
@@ -308,15 +323,19 @@ void HeaderParser::ResolveAllFunctionOverrides()
 
 void HeaderParser::ResolveBaseClassVirtualFunctionsIndex()
 {
-	for (auto& [funcName, func] : mFunctions) {
-		auto* declaringClass = func.DeclaringClass;
-		if (func.IsIndexResolved() || !declaringClass || !declaringClass->HasNoBases() || !func.IsVirtual)
-			continue;
-		if (!func.IsDestructor)
-			func.VirtualIndex = declaringClass->GetNextVirtualIndex();
-		else
-			func.VirtualIndex = 0; // Destructors are always at index 0 of "vtable for this"
-		func.VirtualTableTarget = declaringClass->Name + "_vtable_for_this";
+	for (auto& [className, classInfo] : mClasses) {
+		for (auto* func : classInfo.Functions) {
+			auto* declaringClass = &classInfo;
+			if (func->IsIndexResolved() || !declaringClass || !declaringClass->HasNoBases() || !func->IsVirtual)
+				continue;
+			int index = declaringClass->GetNextVirtualIndex();
+			if (!func->IsDestructor)
+				func->VirtualIndex = index;
+			else {
+				func->VirtualIndex = 0; // Destructors are always at index 0 of "vtable for this"
+			}
+			func->VirtualTableTarget = declaringClass->Name + "_vtable_for_this";
+		}
 	}
 }
 void HeaderParser::ResolveNewVirtualFunctionIndices()
@@ -349,42 +368,45 @@ void HeaderParser::ResolveAllFunctionOverridesIndices()
 	}
 }
 
-void HeaderParser::PrintTranslationUnitDiagnostics()
+void HeaderParser::PrintTranslationUnitErrors()
 {
 	unsigned numDiagnostics = clang_getNumDiagnostics(mTranslationUnit);
 	for (unsigned i = 0; i < numDiagnostics; ++i) {
 		CXDiagnostic diag = clang_getDiagnostic(mTranslationUnit, i);
-
-		// Get severity
 		CXDiagnosticSeverity severity = clang_getDiagnosticSeverity(diag);
-
-		// Convert severity to string if you like
-		const char* severityStr = "";
-		switch (severity) {
-		case CXDiagnostic_Ignored: severityStr = "Ignored"; break;
-		case CXDiagnostic_Note: severityStr = "Note"; break;
-		case CXDiagnostic_Warning: severityStr = "Warning"; break;
-		case CXDiagnostic_Error: severityStr = "Error"; break;
-		case CXDiagnostic_Fatal: severityStr = "Fatal"; break;
-		}
-
-		// Get diagnostic string
+		if (severity != CXDiagnostic_Error && severity != CXDiagnostic_Fatal)
+			continue;
 		CXString diagStr = clang_formatDiagnostic(diag, clang_defaultDiagnosticDisplayOptions());
-		printf("[%s] %s\n", severityStr, clang_getCString(diagStr));
+		std::cout << std::format("[Error] {}", clang_getCString(diagStr)) << std::endl;
 		clang_disposeString(diagStr);
-
-		// Dispose the diagnostic object
 		clang_disposeDiagnostic(diag);
 	}
 }
 
+void HeaderParser::DoStuff()
+{
+	VisitAll();
+	SortAllClassesTopologically();
+	SortAllFunctionsTopologically();
+	ResolveAllClassBases();
+	ResolveAllClassFunctions();
+	ResolveAllFunctionOverrides();
+	ResolveBaseClassVirtualFunctionsIndex();
+	ResolveNewVirtualFunctionIndices();
+	ResolveAllFunctionOverridesIndices();
+	PrintTranslationUnitErrors();
+}
+
 CXChildVisitResult HeaderParser::VisitClass(CXCursor cursor, const std::string& className, const fs::path& file, ClassVisitingData& visitingData)
 {
-	if (HasClass(className) || !IsOnFilter(file))
+	bool isDefinition = clang_isCursorDefinition(cursor);
+	if (HasClass(className) || !IsOnFilter(file) || !isDefinition)
 		return CXChildVisit_Continue;
 
 	ClassInfo& classInfo = (mClasses[className] = ClassInfo{ .Name = className });
+	classInfo.DefinedIn = file;
 	classInfo.Comment = GetCommentForCursor(cursor);
+	classInfo.IsDefinition = isDefinition;
 	visitingData.mParents.push_back(&classInfo);
 	clang_visitChildren(
 		cursor,
@@ -423,10 +445,12 @@ CXChildVisitResult HeaderParser::VisitFunction(CXCursor cursor, const std::strin
 	}
 
 	FunctionInfo& functionInfo = (data.mParser.mFunctions[mangledName] = FunctionInfo{ .MangledName = mangledName });
+	bool isDestructor = clang_getCursorKind(cursor) == CXCursor_Destructor;
 	functionInfo.Comment = data.mParser.GetCommentForCursor(cursor);
+	functionInfo.ShortName = data.mParser.GetFunctionShortName(cursor);
+	functionInfo.IsDestructor = isDestructor;
 	data.mClassData.mParents.back()->FunctionNames.push_back(mangledName);
 	if (clang_CXXMethod_isVirtual(cursor)) {
-		bool isDestructor = clang_getCursorKind(cursor) == CXCursor_Destructor;
 		CXCursor* overridenCursors;
 		unsigned int numOverridenCursors;
 		clang_getOverriddenCursors(cursor, &overridenCursors, &numOverridenCursors);
@@ -436,7 +460,6 @@ CXChildVisitResult HeaderParser::VisitFunction(CXCursor cursor, const std::strin
 		}
 
 		functionInfo.IsVirtual = true;
-		functionInfo.IsDestructor = isDestructor;
 	}
 	return CXChildVisit_Continue;
 }

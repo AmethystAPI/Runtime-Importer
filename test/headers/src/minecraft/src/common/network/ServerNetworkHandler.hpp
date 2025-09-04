@@ -3,6 +3,7 @@
 #include <minecraft/src-deps/core/utility/NonOwnerPointer.hpp>
 #include <minecraft/src/common/CommonTypes.hpp>
 #include <minecraft/src/common/world/level/LevelListener.hpp>
+#include <minecraft/src/common/network/NetEventCallback.hpp>
 
 class ServerPlayer;
 class ILevel;
@@ -23,11 +24,6 @@ private:
     virtual void padding0sgdresgr();
 };
 }
-
-class NetEventCallback {
-    virtual ~NetEventCallback() = default;
-    virtual void padding0_rhegh();
-};
 
 namespace Social {
 class MultiplayerServiceObserver {

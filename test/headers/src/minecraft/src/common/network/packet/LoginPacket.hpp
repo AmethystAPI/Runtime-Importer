@@ -1,7 +1,7 @@
 #pragma once
 #include <minecraft/src/common/network/packet/Packet.hpp>
 
-class ConnectionRequest;
+class ConnectionRequest {};
 
 class LoginPacket : public Packet {
 public:

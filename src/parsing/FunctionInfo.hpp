@@ -6,6 +6,7 @@
 class FunctionInfo {
 public:
 	std::string MangledName;
+	std::string ShortName;
 
 	ClassInfo* DeclaringClass = nullptr;
 

@@ -2,11 +2,14 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include "PathUtils.hpp"
 
 class FunctionInfo;
 class VirtualPointerComment;
 class ClassInfo {
 public:
+	fs::path DefinedIn;
+
 	std::string Name;
 
 	std::vector<ClassInfo*> BaseClasses;
@@ -19,6 +22,7 @@ public:
 	std::vector<VirtualPointerComment> VirtualPointerComments;
 
 	int NextVirtualIndex = 0;
+	bool IsDefinition = false;
 
 	int GetNextVirtualIndex();
 	bool HasNoBases() const;
