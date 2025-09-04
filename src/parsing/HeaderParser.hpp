@@ -57,6 +57,7 @@ public:
 	FunctionInfo* GetFunctionInfoByMangledName(const std::string& mangledName);
 	bool HasClass(const std::string& className);
 	bool HasFunction(const std::string& mangledName);
+	
 
 	void SortAllClassesTopologically();
 	void SortAllFunctionsTopologically();
@@ -66,6 +67,8 @@ public:
 	void ResolveBaseClassVirtualFunctionsIndex();
 	void ResolveNewVirtualFunctionIndices();
 	void ResolveAllFunctionOverridesIndices();
+
+	void PrintTranslationUnitDiagnostics();
 
 private:
 	CXChildVisitResult VisitClass(CXCursor cursor, const std::string& className, const fs::path& file, ClassVisitingData& visitingData);

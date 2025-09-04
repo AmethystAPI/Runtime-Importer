@@ -312,24 +312,28 @@ void HeaderParser::ResolveBaseClassVirtualFunctionsIndex()
 		auto* declaringClass = func.DeclaringClass;
 		if (func.IsIndexResolved() || !declaringClass || !declaringClass->HasNoBases() || !func.IsVirtual)
 			continue;
-		func.VirtualIndex = declaringClass->GetNextVirtualIndex();
+		if (!func.IsDestructor)
+			func.VirtualIndex = declaringClass->GetNextVirtualIndex();
+		else
+			func.VirtualIndex = 0; // Destructors are always at index 0 of "vtable for this"
 		func.VirtualTableTarget = declaringClass->Name + "_vtable_for_this";
 	}
 }
-
 void HeaderParser::ResolveNewVirtualFunctionIndices()
 {
-	for (auto& [funcName, func] : mFunctions) {
-		auto* declaringClass = func.DeclaringClass;
-		if (func.IsIndexResolved() || !declaringClass || !func.IsVirtual || func.OverrideOf)
-			continue;
-		func.VirtualIndex = declaringClass->GetNextVirtualIndex();
-		if (!declaringClass->DoesMultiInheritance())
-			func.VirtualIndex += declaringClass->GetRootBases()[0]->NextVirtualIndex;
-		func.VirtualTableTarget = declaringClass->Name + "_vtable_for_this";
+	for (auto& [className, classInfo] : mClasses) {
+		for (auto* func : classInfo.Functions) {
+			auto* declaringClass = &classInfo;
+			if (func->IsIndexResolved() || !declaringClass || !func->IsVirtual || func->OverrideOf)
+				continue;
+			func->VirtualIndex = declaringClass->GetNextVirtualIndex();
+			if (!declaringClass->DoesMultiInheritance())
+				func->VirtualIndex += declaringClass->GetRootBases()[0]->NextVirtualIndex;
+			func->VirtualTableTarget = declaringClass->Name + "_vtable_for_this";
+		}
 	}
+	
 }
-
 void HeaderParser::ResolveAllFunctionOverridesIndices()
 {
 	for (auto& [funcName, func] : mFunctions) {
@@ -338,19 +342,46 @@ void HeaderParser::ResolveAllFunctionOverridesIndices()
 			continue;
 		auto* baseFunc = func.GetRootBase();
 		func.VirtualIndex = baseFunc->VirtualIndex;
-		if (!declaringClass->DoesMultiInheritance())
+		if (!declaringClass->DoesMultiInheritance() || func.IsDestructor)
 			func.VirtualTableTarget = declaringClass->Name + "_vtable_for_this";
 		else 
 			func.VirtualTableTarget = declaringClass->Name + "_vtable_for_" + baseFunc->DeclaringClass->Name;
+	}
+}
 
+void HeaderParser::PrintTranslationUnitDiagnostics()
+{
+	unsigned numDiagnostics = clang_getNumDiagnostics(mTranslationUnit);
+	for (unsigned i = 0; i < numDiagnostics; ++i) {
+		CXDiagnostic diag = clang_getDiagnostic(mTranslationUnit, i);
+
+		// Get severity
+		CXDiagnosticSeverity severity = clang_getDiagnosticSeverity(diag);
+
+		// Convert severity to string if you like
+		const char* severityStr = "";
+		switch (severity) {
+		case CXDiagnostic_Ignored: severityStr = "Ignored"; break;
+		case CXDiagnostic_Note: severityStr = "Note"; break;
+		case CXDiagnostic_Warning: severityStr = "Warning"; break;
+		case CXDiagnostic_Error: severityStr = "Error"; break;
+		case CXDiagnostic_Fatal: severityStr = "Fatal"; break;
+		}
+
+		// Get diagnostic string
+		CXString diagStr = clang_formatDiagnostic(diag, clang_defaultDiagnosticDisplayOptions());
+		printf("[%s] %s\n", severityStr, clang_getCString(diagStr));
+		clang_disposeString(diagStr);
+
+		// Dispose the diagnostic object
+		clang_disposeDiagnostic(diag);
 	}
 }
 
 CXChildVisitResult HeaderParser::VisitClass(CXCursor cursor, const std::string& className, const fs::path& file, ClassVisitingData& visitingData)
 {
-	if (HasClass(className)) {
+	if (HasClass(className) || !IsOnFilter(file))
 		return CXChildVisit_Continue;
-	}
 
 	ClassInfo& classInfo = (mClasses[className] = ClassInfo{ .Name = className });
 	classInfo.Comment = GetCommentForCursor(cursor);
@@ -395,6 +426,7 @@ CXChildVisitResult HeaderParser::VisitFunction(CXCursor cursor, const std::strin
 	functionInfo.Comment = data.mParser.GetCommentForCursor(cursor);
 	data.mClassData.mParents.back()->FunctionNames.push_back(mangledName);
 	if (clang_CXXMethod_isVirtual(cursor)) {
+		bool isDestructor = clang_getCursorKind(cursor) == CXCursor_Destructor;
 		CXCursor* overridenCursors;
 		unsigned int numOverridenCursors;
 		clang_getOverriddenCursors(cursor, &overridenCursors, &numOverridenCursors);
@@ -404,6 +436,7 @@ CXChildVisitResult HeaderParser::VisitFunction(CXCursor cursor, const std::strin
 		}
 
 		functionInfo.IsVirtual = true;
+		functionInfo.IsDestructor = isDestructor;
 	}
 	return CXChildVisit_Continue;
 }

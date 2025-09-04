@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
         newHashes[h.string()] = hHash;
 
         // Decide if we need to reparse
-        if (true)//oldHashes.find(h.string()) == oldHashes.end() || oldHashes[h.string()] != hHash)
+        if (oldHashes.find(h.string()) == oldHashes.end() || oldHashes[h.string()] != hHash)
         {
             std::cout << "[Changed/Added] " << h << "\n";
 			tuIncludes.push_back(h.string());
@@ -165,9 +165,14 @@ int main(int argc, char** argv) {
     parser.ResolveNewVirtualFunctionIndices();
     parser.ResolveAllFunctionOverridesIndices();
 
+	
+
     for (auto& [className, classInfo] : parser.mClasses) {
 		PrintClassInfo(&classInfo);
     }
+
+    // Print diagnostics
+    parser.PrintTranslationUnitDiagnostics();
 
     for (auto& [className, classInfo] : parser.mClasses) {
         if (classInfo.Comment.has_value()) {

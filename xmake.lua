@@ -34,7 +34,7 @@ target("symgen")
     add_links("$(projectdir)/lib/libclang.lib")
     add_includedirs("src", {public = true})
     add_headerfiles("src/**.hpp")
-    local runargs = {"--input-directory", "$(projectdir)/test/headers/src", "--generated-directory", "$(projectdir)/generated/"}
+    local runargs = {"--input-directory", "$(projectdir)/test/headers/src", "--generated-directory", "$(projectdir)/generated/", "--filters", "minecraft"}
     for _, arg in ipairs(clang_args) do
         table.insert(runargs, arg)
     end

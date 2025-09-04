@@ -12,7 +12,8 @@ public:
 	std::optional<std::string> Comment;
 	std::optional<VirtualIndexComment> VirtualIndexComment;
 
-	bool IsVirtual = true;
+	bool IsDestructor = false;
+	bool IsVirtual = false;
 	int VirtualIndex = -1;
 	std::optional<std::string> VirtualTableTarget = std::nullopt;
 	std::optional<std::string> OverrideOfName = std::nullopt;
