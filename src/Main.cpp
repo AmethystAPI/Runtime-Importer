@@ -7,9 +7,9 @@
 #include "Utils.hpp"
 #include "xxhash/xxhash.h"
 #include "PathUtils.hpp"
-#include "SymbolGenerator.hpp"
 #include "parsing/HeaderParser.hpp"
 #include <algorithm>
+#include "parsing/CommentParser.hpp"
 
 using namespace nlohmann;
 namespace fs = std::filesystem;
@@ -21,17 +21,33 @@ struct SymbolGeneratorContext {
 	std::vector<std::string> ClangArgs;
 } Context;
 
-void PrintClass(ClassInfo& info, int indent) {
-    std::string indentStr(indent * 2, ' ');
-    std::cout << indentStr << "Class: '" << info.mName << "' is virtual: " << (info.isVirtual ? "true" : "false") << "\n";
-    for (auto& func : info.mAllFunctionInfos) {
-        std::cout << indentStr << "  Function: '" << func->mMangledName << "' is virtual: " << (func->isVirtual ? "true" : "false") << "\n";
-	}
-    if (!info.mDirectBaseInfos.empty()) {
-        for (auto* baseInfo : info.mDirectBaseInfos) {
-            PrintClass(*baseInfo, indent + 4);
+void PrintClassInfo(ClassInfo* cls, int indent = 0) {
+    if (!cls) return;
+
+    std::string indentation(indent * 2, ' ');
+    std::cout << indentation << "Class: " << cls->Name
+        << " | Virtual: " << (cls->HasAtLeastOneVirtualFunction() ? "yes" : "no")
+        << " | Base: " << (cls->HasNoBases() ? "yes" : "no")
+        << " | Multi-Inheritance: " << (cls->DoesMultiInheritance() ? "yes" : "no")
+		<< " | LastOwnVirtualIndex: " << cls->NextVirtualIndex
+        << "\n";
+
+    if (!cls->Functions.empty()) {
+        for (auto* func : cls->Functions) {
+            std::cout << indentation << "  - Function: " << func->MangledName
+                << " | Virtual: " << (func->IsVirtual ? "yes" : "no")
+                << " | VTableIndex: " << func->VirtualIndex
+                << " | VTableTarget: " << (func->VirtualTableTarget.has_value() ? *func->VirtualTableTarget : "invalid_vtable");
+            if (func->OverrideOfName.has_value())
+                std::cout << " | Overrides: " << func->OverrideOfName.value();
+            std::cout << "\n";
         }
-	}
+    }
+
+    //// recursively print direct bases
+    //for (auto* base : cls->mDirectBaseInfos) {
+    //    PrintClassInfo(base, indent + 1);
+    //}
 }
 
 int main(int argc, char** argv) {
@@ -99,13 +115,6 @@ int main(int argc, char** argv) {
         }
     }
 
-    for (auto& [oldPath, oldHash] : oldHashes) {
-        if (newHashes.find(oldPath) == newHashes.end()) {
-            std::cout << "[Deleted] " << oldPath << "\n";
-			SymbolGenerator::DeleteSymbolsFor(Context.GeneratedDirectory / "symbols", oldPath);
-        }
-    }
-
     // Save updated checksums
     json out;
     for (auto& [path, h] : newHashes)
@@ -121,13 +130,6 @@ int main(int argc, char** argv) {
 		tuFile << "#include \"" << inc << "\"\n";
     tuFile.close();
 	std::cout << "Generated translation unit: " << (Context.GeneratedDirectory / "generated.cpp") << "\n";
-
-	// Set up Clang index
-	CXIndex index = clang_createIndex(0, 0);
-    if (!index) {
-        std::cerr << "Failed to create Clang index.\n";
-        return 1;
-	}
 
 	// Set up Clang translation unit
     std::vector<const char*> clangArgCStrs;
@@ -148,13 +150,53 @@ int main(int argc, char** argv) {
         },
         Context.Filters);
 
-    // Visit everything
+    // Visit and sort everything
 	parser.VisitAll();
+	parser.SortAllClassesTopologically();
+    parser.SortAllFunctionsTopologically();
+
+	// Resolve relationships
 	parser.ResolveAllClassBases();
     parser.ResolveAllClassFunctions();
+	parser.ResolveAllFunctionOverrides();
+
+	// Resolve virtual stuff
+    parser.ResolveBaseClassVirtualFunctionsIndex();
+    parser.ResolveNewVirtualFunctionIndices();
+    parser.ResolveAllFunctionOverridesIndices();
 
     for (auto& [className, classInfo] : parser.mClasses) {
-		PrintClass(classInfo, 0);
+		PrintClassInfo(&classInfo);
+    }
+
+    for (auto& [className, classInfo] : parser.mClasses) {
+        if (classInfo.Comment.has_value()) {
+            ParsingContext ctx{
+                .mClass = &classInfo
+            };
+            auto parsedComments = CommentParser::ParseComment(*classInfo.Comment, ctx);
+            for (auto& parsedComment : parsedComments) {
+                if (std::holds_alternative<VirtualPointerComment>(parsedComment)) {
+                    auto& parsed = std::get<VirtualPointerComment>(parsedComment);
+                    std::cout << std::hex << parsed.mAddress << " = " << parsed.mForVtable << "\n";
+                }
+            }
+
+            for (auto* func : classInfo.Functions) {
+                ParsingContext ctx{
+                    .mClass = &classInfo,
+                    .mFunction = func
+                };
+
+                auto parsedComments = CommentParser::ParseComment(*(func->Comment), ctx);
+                for (auto& parsedComment : parsedComments) {
+                    if (std::holds_alternative<VirtualIndexComment>(parsedComment)) {
+                        auto& parsed = std::get<VirtualIndexComment>(parsedComment);
+                        std::cout << parsed.mIndex << "\n";
+                    }
+                }
+            }
+        }
     }
 
     auto end = std::chrono::high_resolution_clock::now();

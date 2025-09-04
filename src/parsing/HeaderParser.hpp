@@ -18,8 +18,11 @@ class HeaderParser;
 struct ClassVisitingData {
 	HeaderParser& mParser;
 	std::vector<ClassInfo*> mParents;
-	std::vector<bool> mHasVirtualMethod;
-	ClassInfo* mLastVisited = nullptr;
+};
+
+struct FunctionVisitingData {
+	HeaderParser& mParser;
+	ClassVisitingData& mClassData;
 };
 
 class HeaderParser {
@@ -32,6 +35,7 @@ public:
 	std::unordered_map<std::string, std::string> mClassNameCache;
 	std::unordered_map<std::string, std::string> mClassFullNameCache;
 	std::unordered_map<std::string, std::string> mFunctionMangledNameCache;
+	std::unordered_map<std::string, std::string> mCommentsCache;
 	std::unordered_map<std::string, fs::path> mHeaderPathCache;
 	std::unordered_map<std::string, fs::path> mHeaderRelativePathCache;
 	std::unordered_map<fs::path, bool> mShouldProcessCache;
@@ -47,13 +51,23 @@ public:
 	std::string GetClassFullName(CXCursor cursor);
 	std::string GetFunctionMangledName(CXCursor cursor);
 	std::optional<fs::path> GetFilePathForCursor(CXCursor cursor);
+	std::optional<std::string> GetCommentForCursor(CXCursor cursor);
 	bool IsOnFilter(const fs::path& file);
 	std::string GetCursorUSR(CXCursor cursor);
 	FunctionInfo* GetFunctionInfoByMangledName(const std::string& mangledName);
+	bool HasClass(const std::string& className);
+	bool HasFunction(const std::string& mangledName);
 
+	void SortAllClassesTopologically();
+	void SortAllFunctionsTopologically();
 	void ResolveAllClassBases();
 	void ResolveAllClassFunctions();
+	void ResolveAllFunctionOverrides();
+	void ResolveBaseClassVirtualFunctionsIndex();
+	void ResolveNewVirtualFunctionIndices();
+	void ResolveAllFunctionOverridesIndices();
 
 private:
 	CXChildVisitResult VisitClass(CXCursor cursor, const std::string& className, const fs::path& file, ClassVisitingData& visitingData);
+	CXChildVisitResult VisitFunction(CXCursor cursor, const std::string& mangledName, FunctionVisitingData& visitingData);
 };
