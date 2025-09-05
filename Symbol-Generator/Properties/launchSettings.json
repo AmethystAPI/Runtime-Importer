@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Symbol-Generator": {
+      "commandName": "Project",
+      "commandLineArgs": "generate"
+    }
+  }
+}

@@ -1,4 +1,3 @@
-/.xmake
-/vsxmake2022
-/build
-/generated
+/.vs
+*/obj
+*/bin
