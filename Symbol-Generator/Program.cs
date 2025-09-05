@@ -1,4 +1,5 @@
-﻿using CliFx;
+﻿using Amethyst.SymbolGenerator.Diagnostics;
+using CliFx;
 using System.Runtime.InteropServices;
 
 namespace Amethyst.SymbolGenerator
@@ -13,7 +14,7 @@ namespace Amethyst.SymbolGenerator
             }
             catch
             {
-                Console.WriteLine("Failed to load libclang. Did you forget to instal LLVM and point it's /bin folder to PATH?");
+                Logger.Error("Failed to load libclang. Did you forget to instal LLVM and point it's /bin folder to PATH?");
                 return 1;
             }
 

@@ -2,7 +2,7 @@
   "profiles": {
     "Symbol-Generator": {
       "commandName": "Project",
-      "commandLineArgs": "generate"
+      "commandLineArgs": "generate -i \"./input/src\" -o \"./output\""
     }
   }
 }
