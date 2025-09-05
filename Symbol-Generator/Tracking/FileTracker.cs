@@ -17,8 +17,9 @@ namespace Amethyst.SymbolGenerator.Tracking
         public DirectoryInfo InputDirectory { get; private set; }
         public FileInfo ChecksumFile { get; private set; }
         public string[] SearchPatterns { get; private set; }
+        public string[] Filters { get; private set; }
 
-        public FileTracker(DirectoryInfo inputDirectory, FileInfo checksumFile, string[] searchPatterns)
+        public FileTracker(DirectoryInfo inputDirectory, FileInfo checksumFile, string[] searchPatterns, string[] filters)
         {
             ArgumentNullException.ThrowIfNull(inputDirectory);
             ArgumentNullException.ThrowIfNull(checksumFile);
@@ -28,6 +29,7 @@ namespace Amethyst.SymbolGenerator.Tracking
             InputDirectory = inputDirectory;
             ChecksumFile = checksumFile;
             SearchPatterns = searchPatterns;
+            Filters = filters;
         }
 
         public IEnumerable<FileChange> TrackChanges()
@@ -44,6 +46,8 @@ namespace Amethyst.SymbolGenerator.Tracking
             // Check each file for changes
             foreach (var file in files)
             {
+                if (Filters.Any() && !Filters.Any(f => Path.GetRelativePath(InputDirectory.FullName, file.FullName).StartsWith(f)))
+                    continue;
                 string filePath = file.FullName.NormalizeSlashes();
                 string content = File.ReadAllText(file.FullName);
                 ulong hash = XXH64.DigestOf(Encoding.UTF8.GetBytes(content));
