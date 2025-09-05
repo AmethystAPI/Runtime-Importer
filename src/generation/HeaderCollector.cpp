@@ -1,8 +1,10 @@
 #include "HeaderCollector.hpp"
+
 #include <unordered_map>
 #include <fstream>
-#include <Json.hpp>
-#include "Utils.hpp"
+
+#include "Json.hpp"
+#include "utils/Utils.hpp"
 
 using namespace nlohmann;
 
@@ -32,7 +34,7 @@ std::vector<ChangeRecord> HeaderCollector::CollectChangedHeaders()
     for (auto& p : fs::recursive_directory_iterator(Directory)) {
         bool isOnFilter = Filters.empty();
         for (auto& filter : Filters) {
-            if (PathUtils::CheapIsFrom(fs::relative(p.path(), Directory).generic_string(), filter.generic_string())) {
+            if (PathUtils::CheapIsFrom(p.path().generic_string(), filter.generic_string())) {
                 isOnFilter = true;
                 break;
             }
@@ -49,7 +51,7 @@ std::vector<ChangeRecord> HeaderCollector::CollectChangedHeaders()
 		auto key = header.generic_string();
         uint64_t headerHash = Utils::GetHashForFile(Directory / header);
         newHashes[key] = headerHash;
-        if (!oldHashes.count(key) || oldHashes[key] != headerHash)
+        if (true)//!oldHashes.count(key) || oldHashes[key] != headerHash)
         {
 			changes.emplace_back(header, ChangeType::AddedOrChanged);
         }

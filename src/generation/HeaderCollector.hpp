@@ -1,7 +1,8 @@
 #pragma once
-#include "PathUtils.hpp"
 #include <unordered_map>
 #include <string>
+
+#include "utils/PathUtils.hpp"
 
 enum class ChangeType {
 	AddedOrChanged,

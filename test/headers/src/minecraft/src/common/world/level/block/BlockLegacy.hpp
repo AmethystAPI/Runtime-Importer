@@ -1,3 +1,4 @@
+/// @symgen
 #pragma once
 #include <functional>
 #include <optional>
@@ -28,6 +29,7 @@
 #include <minecraft/src/common/world/phys/ShapeType.hpp>
 #include <minecraft/src/common/world/level/block/BlockProperty.hpp>
 
+
 // Auto-generated: Unknown complete types
 enum BlockSupportType {};
 enum Flip {};
@@ -52,8 +54,6 @@ class Random;
 class Experiments;
 class EntityContext;
 struct ResourceDropsContext;
-
-
 // other types
 enum class FlameOdds : char {
     INSTANT = 60,
@@ -85,7 +85,7 @@ enum class BurnOdds : char {
 //        ("unsigned char", "mLightBlock", 1, 373),
 //        ("mce::Color", "mMapColor", 16, 396)]
 
-#pragma pack(push, 1)
+/// @VirtualTable {0xDEADBEEF, this}
 class BlockLegacy : public BlockComponentStorage {
 public:
     class AlteredStateCollection {
@@ -314,6 +314,8 @@ protected:
     virtual mce::Color getMapColor(BlockSource& a2, const BlockPos& a3, const Block& a4) const;
 
 private:
+    /// @vidx {0}
+    /// @v
     virtual void _onHitByActivatingAttack(BlockSource&, const BlockPos&, Actor*) const;
     virtual void entityInside(BlockSource& a2, const BlockPos& a3, Actor& a4) const;
 
@@ -323,7 +325,9 @@ public:
     /** @signature {AA BB CC DD} */
     short getBlockItemId();
 
+    /// @address {0xDEADBEEF}
     void setDestroyTime(float destroyTime, float explosionResistance);
+    /// @signature {DE AD BE EF}
     void addState(const BlockState& blockState);
     bool isAir() const;
     bool hasProperty(BlockProperty prop) const;
@@ -332,7 +336,7 @@ public:
 private: 
     std::optional<int> _tryLookupAlteredStateCollection(uint64_t stateId, uint16_t blockData);
 };
-#pragma pack(pop)
+
 
 // 1.21.0.3
-static_assert(sizeof(BlockLegacy) == 984);
+//static_assert(sizeof(BlockLegacy) == 984);

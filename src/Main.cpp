@@ -1,59 +1,42 @@
 #include <iostream>
 #include <unordered_set>
 #include <stack>
-#include "clang-c/Index.h"
-#include "CLI11.hpp"
-#include "Json.hpp"
-#include "Utils.hpp"
-#include "xxhash/xxhash.h"
-#include "PathUtils.hpp"
-#include "parsing/HeaderParser.hpp"
 #include <algorithm>
-#include "parsing/CommentParser.hpp"
-#include "HeaderCollector.hpp"
-#include "regex"
+#include <regex>
+
+#include "Json.hpp"
+#include "CLI11.hpp"
+
+#include "utils/PathUtils.hpp"
+#include "utils/Utils.hpp"
+#include "utils/ClassInfoPrinter.hpp"
+
+#include "generation/HeaderCollector.hpp"
+#include "generation/symbol/SymbolGenerator.hpp"
+
+#include "parsing/HeaderParser.hpp"
+#include "parsing/annotations/CommentProcessor.hpp"
+#include "parsing/annotations/AnnotationProcessor.hpp"
+
 
 using namespace nlohmann;
 namespace fs = std::filesystem;
 
 struct SymbolGeneratorContext {
     fs::path InputDirectory;
-	fs::path GeneratedDirectory;
+    fs::path GeneratedDirectory;
 	std::vector<fs::path> Filters;
 	std::vector<std::string> ClangArgs;
-} Context;
-
-void PrintClassInfo(ClassInfo* cls, int indent = 0) {
-    if (!cls) return;
-
-    std::string indentation(indent * 2, ' ');
-    std::cout << indentation << "Class: " << cls->Name
-        << " | Virtual: " << (cls->HasAtLeastOneVirtualFunction() ? "yes" : "no")
-        << " | Base: " << (cls->HasNoBases() ? "yes" : "no")
-        << " | Multi-Inheritance: " << (cls->DoesMultiInheritance() ? "yes" : "no")
-		<< " | LastOwnVirtualIndex: " << cls->NextVirtualIndex
-        << "\n";
-
-    if (!cls->Functions.empty()) {
-        for (auto* func : cls->Functions) {
-            std::cout << indentation << "  - Function: " << func->ShortName
-                << " | Virtual: " << (func->IsVirtual ? "yes" : "no")
-                << " | VTableIndex: " << func->VirtualIndex
-                << " | VTableTarget: " << (func->VirtualTableTarget.has_value() ? *func->VirtualTableTarget : "invalid_vtable");
-            if (func->OverrideOfName.has_value())
-                std::cout << " | Overrides: " << func->OverrideOfName.value();
-            std::cout << "\n";
-        }
-    }
-}
+};
 
 int main(int argc, char** argv) {
+    SymbolGeneratorContext ctx;
 	CLI::App app{ "Amethyst Symbol Generator v0.0.1" };
 
 	// Add options
-	app.add_option("--input-directory", Context.InputDirectory, "The input directory to look for header files.");
-	app.add_option("--generated-directory", Context.GeneratedDirectory, "The output directory to write generated files to.");
-    app.add_option("--filters", Context.Filters, "Only process headers that have the relative path starting with those filters.")->expected(1, -1);
+	app.add_option("--input-directory", ctx.InputDirectory, "The input directory to look for header files.");
+	app.add_option("--generated-directory", ctx.GeneratedDirectory, "The output directory to write generated files to.");
+    app.add_option("--filters", ctx.Filters, "Only process headers that have the relative path starting with those filters.")->expected(1, -1);
 	app.allow_extras();
 	app.set_help_all_flag("--help-all", "Expand all help");
 
@@ -61,31 +44,29 @@ int main(int argc, char** argv) {
 	CLI11_PARSE(app, argc, argv);
 
 	// Collect remaining arguments as clang args
-    Context.ClangArgs = app.remaining();
-    Context.InputDirectory = Context.InputDirectory.generic_string();
+    ctx.ClangArgs = app.remaining();
 
-    fs::path checksumPath = Context.GeneratedDirectory / "checksums.json";
-    fs::path symbolsPath = Context.GeneratedDirectory / "symbols";
+    ctx.InputDirectory = ctx.InputDirectory.generic_string();
+	ctx.GeneratedDirectory = ctx.GeneratedDirectory.generic_string();
+    for (auto& filter : ctx.Filters)
+		filter = (ctx.InputDirectory / filter).generic_string();
 
+    fs::path checksumPath = ctx.GeneratedDirectory / "checksums.json";
+    fs::path symbolsPath = ctx.GeneratedDirectory / "symbols";
+
+	// Collect all headers that have changed
     std::vector<fs::path> includes;
     Utils::Benchmark([&]() {
-        HeaderCollector collector(Context.InputDirectory, checksumPath, Context.Filters);
+        HeaderCollector collector(ctx.InputDirectory, checksumPath, ctx.Filters);
         auto changes = collector.CollectChangedHeaders();
         for (auto& change : changes) {
             if (change.Type == ChangeType::AddedOrChanged) {
-                std::ifstream file(Context.InputDirectory / change.Path);
-                if (!file)
-                    continue;
-                std::string content((std::istreambuf_iterator<char>(file)),
-                    std::istreambuf_iterator<char>());
-
-                std::regex marker(R"(\/\/\/\s*@symgen)");
-                if (!std::regex_search(content, marker))
-                    continue;
+                if (!Utils::HasSymbolGenerationMarker(ctx.InputDirectory / change.Path))
+					continue;
                 includes.push_back(change.Path);
             }
             else if (change.Type == ChangeType::Removed) {
-                fs::path symbolPath = symbolsPath / change.Path;
+                fs::path symbolPath = symbolsPath / (change.Path.generic_string() + ".symbols.json");
                 if (fs::exists(symbolPath))
                     fs::remove(symbolPath);
             }
@@ -93,44 +74,106 @@ int main(int argc, char** argv) {
     }, "Collect headers");
 
     std::vector<const char*> clangArgCStrs;
-    for (auto& arg : Context.ClangArgs)
+    for (auto& arg : ctx.ClangArgs)
         clangArgCStrs.push_back(arg.c_str());
 
-    auto mainFile = Context.GeneratedDirectory / "generated.cpp";
+	// Create translation unit with all headers
+    auto mainFile = ctx.GeneratedDirectory / "generated.cpp";
     Utils::CreateCPPFileFor(mainFile, includes);
     HeaderParser parser(
-        Context.InputDirectory,
         mainFile.string(),
         clangArgCStrs,
         CXTranslationUnit_DetailedPreprocessingRecord |
-        CXTranslationUnit_SkipFunctionBodies,
-        ParsingData{
-            .mInputDirectory = Context.InputDirectory
+        CXTranslationUnit_SkipFunctionBodies |
+        CXTranslationUnit_KeepGoing,
+        HeaderParser::ParserContext {
+            .InputDirectory = ctx.InputDirectory
         },
-        Context.Filters
+        ctx.Filters
     );
 
+	// Parse all headers
     Utils::Benchmark([&]() {
         parser.DoStuff();
     }, "Parse all headers");
 
-    for (auto& [className, classInfo] : parser.mClasses) {
-        if (!classInfo.IsDefinition || !classInfo.Comment)
-            continue;
-        auto definedInRelative = fs::relative(classInfo.DefinedIn, Context.InputDirectory);
-        bool isInIncludes = false;
-        for (auto& inc : includes) {
-            if (inc == definedInRelative) {
-                isInIncludes = true;
-                break;
-            }
-        }
-        if (isInIncludes)
-            PrintClassInfo(&classInfo);
+    parser.PrintTranslationUnitErrors();
+    if (parser.HasAnyErrors()) {
+        return -1;
     }
-    fs::create_directories(symbolsPath);
 
-    // Pause before exit
-	std::cout << "Press Enter to exit...";
-	std::cin.get();
+    for (auto& [usr, classInfo] : parser.Classes) {
+        if (!classInfo.Location || 
+            !Utils::IsFileInIncludes(classInfo.Location->FilePath, ctx.InputDirectory, includes) ||
+            !classInfo.RawComment.has_value())
+            continue;
+
+        auto annotations = CommentProcessor::ProcessComment(*classInfo.RawComment);
+        for (auto& annotation : annotations) {
+			AnnotationProcessor::Apply(&classInfo, annotation);
+		}
+    }
+
+    for (auto& [usr, methodInfo] : parser.Methods) {
+		if (!methodInfo.Location ||
+            !Utils::IsFileInIncludes(methodInfo.Location->FilePath, ctx.InputDirectory, includes) ||
+            !methodInfo.RawComment.has_value())
+            continue;
+
+        auto annotations = CommentProcessor::ProcessComment(*methodInfo.RawComment);
+        for (auto& annotation : annotations) {
+            AnnotationProcessor::Apply(&methodInfo, annotation);
+        }
+    }
+
+	std::vector<ClassInfo*> classes;
+	std::vector<MethodInfo*> methods;
+
+	for (auto& [usr, classInfo] : parser.Classes) {
+		classes.push_back(&classInfo);
+	}
+
+	for (auto& [usr, methodInfo] : parser.Methods) {
+		methods.push_back(&methodInfo);
+	}
+
+	auto symbolMap = SymbolGenerator::GenerateSymbolData(classes, methods);
+    for (auto& [file, symbols] : symbolMap) {
+        fs::path relativePath = fs::relative(file, ctx.InputDirectory);
+		fs::path symbolFile = symbolsPath / relativePath.parent_path() / (relativePath.stem().string() + ".symbols.json");
+	
+		json j;
+		j["format_version"] = 1;
+		j["vtables"] = json::object();
+		j["functions"] = json::object();
+        for (auto& symbol : symbols) {
+            if (symbol.Type == SymbolType::VirtualTableSymbol) {
+                j["vtables"][symbol.Name] = {
+                    { "address", std::format("0x{:X}", symbol.Address.has_value() ? *symbol.Address : 0x0) }
+				};
+            }
+            else if (symbol.Type == SymbolType::VirtualFunctionSymbol) {
+                j["functions"][symbol.Name] = {
+                    { "vtable", *symbol.VirtualTableTarget },
+                    { "index", *symbol.VirtualIndex }
+                };
+            }
+            else if (symbol.Type == SymbolType::FunctionSymbol) {
+                if (symbol.Address.has_value()) {
+                    j["functions"][symbol.Name] = {
+                        { "address", std::format("0x{:X}", *symbol.Address) }
+                    };
+                }
+                else if (symbol.Signature.has_value()) {
+                    j["functions"][symbol.Name] = {
+                        { "signature", *symbol.Signature }
+                    };
+                }
+			}
+        }
+		std::ofstream outFile(symbolFile);
+		outFile << j.dump(4) << std::endl;
+    }
+
+    return 0;
 }

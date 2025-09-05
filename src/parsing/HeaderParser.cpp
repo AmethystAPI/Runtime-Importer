@@ -1,20 +1,18 @@
 #include "parsing/HeaderParser.hpp"
-#include "PathUtils.hpp"
+
 #include <stdexcept>
 #include <iostream>
 #include <functional>
 
-HeaderParser::HeaderParser(const fs::path& mainDir, const std::string& file, const std::vector<const char*>& arguments, unsigned int flags, const ParsingData& data, const std::vector<fs::path>& pathFilters) :
-	MainDirectory(mainDir),
-	mPathFilters(pathFilters),
-	mParsingData(data)
+#include "utils/PathUtils.hpp"
+
+HeaderParser::HeaderParser(const std::string& file, const std::vector<const char*>& arguments, unsigned int flags, const ParserContext& ctx, const std::vector<fs::path>& pathFilters) :
+	PathFilters(pathFilters),
+	Context(ctx)
 {
-	for (auto& filter : mPathFilters) {
-		filter = (mParsingData.mInputDirectory / filter).generic_string();
-	}
-	mIndex = clang_createIndex(0, 0);
-	mTranslationUnit = clang_parseTranslationUnit(
-		mIndex,
+	Index = clang_createIndex(0, 0);
+	TranslationUnit = clang_parseTranslationUnit(
+		Index,
 		file.c_str(),
 		arguments.data(),
 		static_cast<int>(arguments.size()),
@@ -23,51 +21,21 @@ HeaderParser::HeaderParser(const fs::path& mainDir, const std::string& file, con
 		flags
 	);
 
-	if (!mTranslationUnit) {
-		clang_disposeIndex(mIndex);
+	if (!TranslationUnit) {
+		clang_disposeIndex(Index);
 		throw std::runtime_error("Failed to parse translation unit: " + file);
 	}
 }
-
 HeaderParser::~HeaderParser()
 {
-	clang_disposeTranslationUnit(mTranslationUnit);
-	clang_disposeIndex(mIndex);
+	clang_disposeTranslationUnit(TranslationUnit);
+	clang_disposeIndex(Index);
 }
-
-void HeaderParser::VisitAll()
-{
-	CXCursor rootCursor = clang_getTranslationUnitCursor(mTranslationUnit);
-	clang_visitChildren(
-		rootCursor,
-		[](CXCursor c, CXCursor parent, CXClientData client_data) {
-			auto cursorHash = clang_hashCursor(c);
-			HeaderParser& parser = *reinterpret_cast<HeaderParser*>(client_data);
-			CXCursorKind kind = clang_getCursorKind(c);
-			auto filePath = parser.GetFilePathForCursor(c);
-
-			if (!filePath.has_value() || !parser.IsOnFilter(*filePath))
-				return CXChildVisit_Continue;
-
-			if (kind == CXCursor_ClassDecl || kind == CXCursor_StructDecl) {
-				auto className = parser.GetClassFullName(c);
-				if (parser.mClasses.find(className) != parser.mClasses.end()) {
-					return CXChildVisit_Continue;
-				}
-				ClassVisitingData data{ .mParser = parser, .mParents = {} };
-				return parser.VisitClass(c, className, *filePath, data);
-			}
-			return CXChildVisit_Recurse;
-		},
-		this
-	);
-}
-
 std::string HeaderParser::GetClassName(CXCursor cursor)
 {
 	auto usr = GetCursorUSR(cursor);
-	if (mClassNameCache.find(usr) != mClassNameCache.end()) {
-		return mClassNameCache[usr];
+	if (ClassNameCache.find(usr) != ClassNameCache.end()) {
+		return ClassNameCache[usr];
 	}
 	auto cxClassName = clang_getCursorSpelling(cursor);
 	std::string className = clang_getCString(cxClassName);
@@ -75,20 +43,19 @@ std::string HeaderParser::GetClassName(CXCursor cursor)
 		className = "unnamed_" + usr;
 	}
 	clang_disposeString(cxClassName);
-	mClassNameCache[usr] = className;
+	ClassNameCache[usr] = className;
 	return className;
 }
-
 std::string HeaderParser::GetClassFullName(CXCursor cursor)
 {
 	auto usr = GetCursorUSR(cursor);
-	if (mClassFullNameCache.find(usr) != mClassFullNameCache.end()) {
-		return mClassFullNameCache[usr];
+	if (ClassFullNameCache.find(usr) != ClassFullNameCache.end()) {
+		return ClassFullNameCache[usr];
 	}
 	auto className = GetClassName(cursor);
 	auto parent = clang_getCursorSemanticParent(cursor);
 	if (clang_Cursor_isNull(parent)) {
-		mClassFullNameCache[usr] = className;
+		ClassFullNameCache[usr] = className;
 		return className;
 	}
 
@@ -99,67 +66,79 @@ std::string HeaderParser::GetClassFullName(CXCursor cursor)
 	else {
 		fullName = GetClassFullName(parent) + "::" + className;
 	}
-	mClassFullNameCache[usr] = fullName;
+	ClassFullNameCache[usr] = fullName;
 	return fullName;
 }
-
 std::string HeaderParser::GetFunctionMangledName(CXCursor cursor)
 {
 	auto usr = GetCursorUSR(cursor);
-	if (mFunctionMangledNameCache.find(usr) != mFunctionMangledNameCache.end()) {
-		return mFunctionMangledNameCache[usr];
+	if (FunctionMangledNameCache.find(usr) != FunctionMangledNameCache.end()) {
+		return FunctionMangledNameCache[usr];
 	}
 	else {
 		auto mangledName = clang_Cursor_getMangling(cursor);
 		std::string mangledNameStr = clang_getCString(mangledName);
 		clang_disposeString(mangledName);
-		mFunctionMangledNameCache[usr] = mangledNameStr;
+		FunctionMangledNameCache[usr] = mangledNameStr;
 		return mangledNameStr;
 	}
 }
-
 std::string HeaderParser::GetFunctionShortName(CXCursor cursor)
 {
 	auto usr = GetCursorUSR(cursor);
-	if (mFunctionShortNameCache.find(usr) != mFunctionShortNameCache.end()) {
-		return mFunctionShortNameCache[usr];
+	if (FunctionShortNameCache.find(usr) != FunctionShortNameCache.end()) {
+		return FunctionShortNameCache[usr];
 	}
 	else {
 		auto shortName = clang_getCursorSpelling(cursor);
 		std::string shortNameStr = clang_getCString(shortName);
 		clang_disposeString(shortName);
-		mFunctionShortNameCache[usr] = shortNameStr;
+		FunctionShortNameCache[usr] = shortNameStr;
 		return shortNameStr;
 	}
 }
-
-std::optional<fs::path> HeaderParser::GetFilePathForCursor(CXCursor cursor)
+CursorLocation* HeaderParser::GetCursorLocation(CXCursor cursor)
 {
 	auto usr = GetCursorUSR(cursor);
-	if (mHeaderPathCache.find(usr) != mHeaderPathCache.end()) {
-		return mHeaderPathCache[usr];
+	if (CursorLocationCache.find(usr) != CursorLocationCache.end()) {
+		return &CursorLocationCache[usr];
 	}
 	else {
 		CXFile cxFile;
-		clang_getSpellingLocation(clang_getCursorLocation(cursor), &cxFile, nullptr, nullptr, nullptr);
-		if (!cxFile) {
-			return std::nullopt;
+		unsigned int line = -1;
+		unsigned int column = -1;
+		clang_getSpellingLocation(clang_getCursorLocation(clang_getCursorDefinition(cursor)), &cxFile, &line, &column, nullptr);
+		if (!cxFile && line == -1 && column == -1) {
+			return nullptr;
 		}
-		auto cxFileName = clang_getFileName(cxFile);
-		std::string fileName = clang_getCString(cxFileName);
-		clang_disposeString(cxFileName);
-		auto filePath = fs::path(fileName).generic_string();
-		auto rel = PathUtils::MakeRelative(MainDirectory, filePath);
-		mHeaderPathCache[usr] = rel;
-		return filePath;
+		
+		fs::path filePath;
+		if (cxFile) {
+			auto cxFileName = clang_getFileName(cxFile);
+			auto csFileName = clang_getCString(cxFileName);
+			if (csFileName) {
+				filePath = fs::path(csFileName).generic_string();
+			}
+			clang_disposeString(cxFileName);
+		}
+		else {
+			filePath = "unknown";
+		}
+		
+		return &(CursorLocationCache[usr] = CursorLocation{
+			.FilePath = filePath,
+			.Line = line,
+			.Column = column
+		});
 	}
+	return nullptr;
 }
 
 std::optional<std::string> HeaderParser::GetCommentForCursor(CXCursor cursor)
 {
 	auto usr = GetCursorUSR(cursor);
-	if (mCommentsCache.find(usr) != mCommentsCache.end())
-		return mCommentsCache[usr];
+	if (CommentsCache.find(usr) != CommentsCache.end())
+		return CommentsCache[usr];
 	auto cxComment = clang_Cursor_getRawCommentText(cursor);
 	auto csComment = clang_getCString(cxComment);
 	if (!csComment)
@@ -169,13 +148,12 @@ std::optional<std::string> HeaderParser::GetCommentForCursor(CXCursor cursor)
 	}
 	std::string comment = csComment;
 	clang_disposeString(cxComment);
-	return mCommentsCache[usr] = comment;
+	return CommentsCache[usr] = comment;
 }
-
 bool HeaderParser::IsOnFilter(const fs::path& file)
 {
-	if (!mPathFilters.empty()) {
-		for (const auto& filter : mPathFilters) {
+	if (!PathFilters.empty()) {
+		for (const auto& filter : PathFilters) {
 			if (PathUtils::CheapIsFrom(file, filter)) {
 				return true;
 			}
@@ -184,7 +162,38 @@ bool HeaderParser::IsOnFilter(const fs::path& file)
 	}
 	return true;
 }
+bool HeaderParser::WasDefinitionVisited(const std::string& usr)
+{
+	return VisitedDefinitions.count(usr);
+}
+bool HeaderParser::HasFunctionBody(CXCursor cursor) {
+	CXCursor def = clang_getCursorDefinition(cursor);
+	if (!clang_Cursor_isNull(def)) {
+		bool hasBody = false;
+		clang_visitChildren(def,
+			[](CXCursor c, CXCursor parent, CXClientData client_data) {
+				if (clang_getCursorKind(c) == CXCursor_CompoundStmt) {
+					*reinterpret_cast<bool*>(client_data) = true;
+					return CXChildVisit_Break;
+				}
+				return CXChildVisit_Recurse;
+			},
+			&hasBody);
+		return hasBody;
+	}
 
+	bool hasBody = false;
+	clang_visitChildren(cursor,
+		[](CXCursor c, CXCursor parent, CXClientData client_data) {
+			if (clang_getCursorKind(c) == CXCursor_CompoundStmt) {
+				*reinterpret_cast<bool*>(client_data) = true;
+				return CXChildVisit_Break;
+			}
+			return CXChildVisit_Recurse;
+		},
+		&hasBody);
+	return hasBody;
+}
 std::string HeaderParser::GetCursorUSR(CXCursor cursor)
 {
 	auto usr = clang_getCursorUSR(cursor);
@@ -192,139 +201,136 @@ std::string HeaderParser::GetCursorUSR(CXCursor cursor)
 	clang_disposeString(usr);
 	return usrStr;
 }
-
-FunctionInfo* HeaderParser::GetFunctionInfoByMangledName(const std::string& mangledName)
+MethodInfo* HeaderParser::GetMethodInfo(const std::string& usr)
 {
-	if (mFunctions.find(mangledName) != mFunctions.end()) {
-		return &mFunctions[mangledName];
+	if (Methods.find(usr) != Methods.end()) {
+		return &Methods[usr];
 	}
 	return nullptr;
 }
-
-bool HeaderParser::HasClass(const std::string& className)
+ClassInfo* HeaderParser::GetClassInfo(const std::string& usr)
 {
-	return mClasses.find(className) != mClasses.end();
+	if (Classes.find(usr) != Classes.end()) {
+		return &Classes[usr];
+	}
+	return nullptr;
 }
-
+bool HeaderParser::HasClass(const std::string& usr)
+{
+	return Classes.find(usr) != Classes.end();
+}
 bool HeaderParser::HasFunction(const std::string& mangledName)
 {
-	return mFunctions.find(mangledName) != mFunctions.end();
+	return Methods.find(mangledName) != Methods.end();
 }
-
 void HeaderParser::SortAllClassesTopologically()
 {
 	std::unordered_map<std::string, ClassInfo*> classMap;
-	for (auto& [name, cls] : mClasses)
-		classMap[name] = &cls;
+	for (auto& [usr, cls] : Classes)
+		classMap[usr] = &cls;
 
-	std::unordered_set<std::string> visited;
+	std::unordered_set<ClassInfo*> visited;
 	std::stack<ClassInfo*> sortedStack;
-	std::function<void(ClassInfo*)> visitClass = [&](ClassInfo* cls) {
-		if (!cls || visited.count(cls->Name)) return;
-		visited.insert(cls->Name);
+	std::function<void(ClassInfo*)> VisitClassDFS = [&](ClassInfo* cls) {
+		if (!cls || visited.count(cls)) return;
+		visited.insert(cls);
 
-		for (const auto& baseName : cls->BaseClassNames) {
-			auto it = classMap.find(baseName);
+		for (const auto& baseUsr : cls->BaseClassUSRs) {
+			auto it = classMap.find(baseUsr);
 			if (it != classMap.end()) {
-				visitClass(it->second);
+				VisitClassDFS(it->second);
 			}
 		}
 
 		sortedStack.push(cls);
 	};
 
-	for (auto& [name, cls] : mClasses) {
-		visitClass(&cls);
+	for (auto& [usr, cls] : Classes) {
+		VisitClassDFS(&cls);
 	}
 
 	std::vector<std::pair<std::string, ClassInfo>> sortedClasses;
 	while (!sortedStack.empty()) {
 		ClassInfo* cls = sortedStack.top();
 		sortedStack.pop();
-		sortedClasses.emplace_back(cls->Name, *cls);
+		sortedClasses.emplace_back(cls->USR, *cls);
 	}
 
 	std::reverse(sortedClasses.begin(), sortedClasses.end());
 
-	mClasses.clear();
+	Classes.clear();
 	for (auto& pair : sortedClasses) {
-		mClasses[pair.first] = std::move(pair.second);
+		Classes[pair.first] = std::move(pair.second);
 	}
 }
-
-void HeaderParser::SortAllFunctionsTopologically()
+void HeaderParser::SortAllMethodsTopologically()
 {
-	std::unordered_map<std::string, FunctionInfo*> funcMap;
-	for (auto& [name, func] : mFunctions)
-		funcMap[name] = &func;
+	std::unordered_map<std::string, MethodInfo*> methodsMap;
+	for (auto& [usr, method] : Methods)
+		methodsMap[usr] = &method;
 
-	std::unordered_set<FunctionInfo*> visited;
-	std::vector<FunctionInfo*> sortedFuncs;
+	std::unordered_set<MethodInfo*> visited;
+	std::vector<MethodInfo*> sortedMethods;
 
-	std::function<void(FunctionInfo*)> visitFunc = [&](FunctionInfo* func) {
-		if (!func || visited.count(func)) return;
-		visited.insert(func);
-		if (func->OverrideOfName.has_value()) {
-			auto& baseName = func->OverrideOfName.value();
-			auto it = funcMap.find(baseName);
-			if (it != funcMap.end()) {
-				visitFunc(it->second);
+	std::function<void(MethodInfo*)> VisitMethodDFS = [&](MethodInfo* method) {
+		if (!method || visited.count(method)) return;
+		visited.insert(method);
+		if (method->OverrideOfUSR.has_value()) {
+			auto& overrideUsr = method->OverrideOfUSR.value();
+			auto it = methodsMap.find(overrideUsr);
+			if (it != methodsMap.end()) {
+				VisitMethodDFS(it->second);
 			}
 		}
-		sortedFuncs.push_back(func);
+		sortedMethods.push_back(method);
 	};
 
-	for (auto& [name, func] : mFunctions) {
-		visitFunc(&func);
+	for (auto& [name, method] : Methods) {
+		VisitMethodDFS(&method);
 	}
 
-	std::unordered_map<std::string, FunctionInfo> newFuncs;
-	for (auto* func : sortedFuncs) {
-		newFuncs[func->MangledName] = std::move(*func);
+	std::unordered_map<std::string, MethodInfo> newMethods;
+	for (auto* method : sortedMethods) {
+		newMethods[method->USR] = std::move(*method);
 	}
 
-	mFunctions = std::move(newFuncs);
+	Methods = std::move(newMethods);
 }
-
-
 void HeaderParser::ResolveAllClassBases()
 {
-	for (auto& [className, classInfo] : mClasses) {
-		for (auto& baseName : classInfo.BaseClassNames) {
-			if (mClasses.find(baseName) != mClasses.end()) {
-				classInfo.BaseClasses.push_back(&mClasses[baseName]);
+	for (auto& [usr, classInfo] : Classes) {
+		for (auto& baseUsr : classInfo.BaseClassUSRs) {
+			if (auto* base = GetClassInfo(baseUsr)) {
+				classInfo.BaseClasses.push_back(base);
 			}
 		}
 	}
 }
-
 void HeaderParser::ResolveAllClassFunctions()
 {
-	for (auto& [className, classInfo] : mClasses) {
-		for (auto& funcName : classInfo.FunctionNames) {
-			if (mFunctions.find(funcName) != mFunctions.end()) {
-				auto* func = &mFunctions[funcName];
-				func->DeclaringClass = &classInfo;
-				classInfo.Functions.push_back(func);
+	for (auto& [classUsr, classInfo] : Classes) {
+		for (auto& funcUsr : classInfo.MethodUSRs) {
+			if (auto* method = GetMethodInfo(funcUsr)) {
+				method->DeclaringClass = &classInfo;
+				method->Location->FilePath = classInfo.Location->FilePath;
+				classInfo.Methods.push_back(method);
 			}
 		}
 	}
 }
-
 void HeaderParser::ResolveAllFunctionOverrides()
 {
-	for (auto& [funcName, funcInfo] : mFunctions) {
-		if (funcInfo.OverrideOfName.has_value()) {
-			auto& baseName = funcInfo.OverrideOfName.value();
-			funcInfo.OverrideOf = GetFunctionInfoByMangledName(baseName);
+	for (auto& [funcUsr, funcInfo] : Methods) {
+		if (funcInfo.OverrideOfUSR.has_value()) {
+			auto& baseUsr = funcInfo.OverrideOfUSR.value();
+			funcInfo.OverrideOf = GetMethodInfo(baseUsr);
 		}
 	}
 }
-
 void HeaderParser::ResolveBaseClassVirtualFunctionsIndex()
 {
-	for (auto& [className, classInfo] : mClasses) {
-		for (auto* func : classInfo.Functions) {
+	for (auto& [className, classInfo] : Classes) {
+		for (auto* func : classInfo.Methods) {
 			auto* declaringClass = &classInfo;
 			if (func->IsIndexResolved() || !declaringClass || !declaringClass->HasNoBases() || !func->IsVirtual)
 				continue;
@@ -340,8 +346,8 @@ void HeaderParser::ResolveBaseClassVirtualFunctionsIndex()
 }
 void HeaderParser::ResolveNewVirtualFunctionIndices()
 {
-	for (auto& [className, classInfo] : mClasses) {
-		for (auto* func : classInfo.Functions) {
+	for (auto& [className, classInfo] : Classes) {
+		for (auto* func : classInfo.Methods) {
 			auto* declaringClass = &classInfo;
 			if (func->IsIndexResolved() || !declaringClass || !func->IsVirtual || func->OverrideOf)
 				continue;
@@ -355,7 +361,7 @@ void HeaderParser::ResolveNewVirtualFunctionIndices()
 }
 void HeaderParser::ResolveAllFunctionOverridesIndices()
 {
-	for (auto& [funcName, func] : mFunctions) {
+	for (auto& [funcName, func] : Methods) {
 		auto* declaringClass = func.DeclaringClass;
 		if (func.IsIndexResolved() || !declaringClass || declaringClass->HasNoBases() || !func.IsVirtual || !func.OverrideOf)
 			continue;
@@ -367,12 +373,11 @@ void HeaderParser::ResolveAllFunctionOverridesIndices()
 			func.VirtualTableTarget = declaringClass->Name + "_vtable_for_" + baseFunc->DeclaringClass->Name;
 	}
 }
-
 void HeaderParser::PrintTranslationUnitErrors()
 {
-	unsigned numDiagnostics = clang_getNumDiagnostics(mTranslationUnit);
+	unsigned numDiagnostics = clang_getNumDiagnostics(TranslationUnit);
 	for (unsigned i = 0; i < numDiagnostics; ++i) {
-		CXDiagnostic diag = clang_getDiagnostic(mTranslationUnit, i);
+		CXDiagnostic diag = clang_getDiagnostic(TranslationUnit, i);
 		CXDiagnosticSeverity severity = clang_getDiagnosticSeverity(diag);
 		if (severity != CXDiagnostic_Error && severity != CXDiagnostic_Fatal)
 			continue;
@@ -382,84 +387,174 @@ void HeaderParser::PrintTranslationUnitErrors()
 		clang_disposeDiagnostic(diag);
 	}
 }
-
 void HeaderParser::DoStuff()
 {
 	VisitAll();
 	SortAllClassesTopologically();
-	SortAllFunctionsTopologically();
+	SortAllMethodsTopologically();
 	ResolveAllClassBases();
 	ResolveAllClassFunctions();
 	ResolveAllFunctionOverrides();
 	ResolveBaseClassVirtualFunctionsIndex();
 	ResolveNewVirtualFunctionIndices();
 	ResolveAllFunctionOverridesIndices();
-	PrintTranslationUnitErrors();
 }
-
-CXChildVisitResult HeaderParser::VisitClass(CXCursor cursor, const std::string& className, const fs::path& file, ClassVisitingData& visitingData)
+bool HeaderParser::HasAnyErrors()
 {
-	bool isDefinition = clang_isCursorDefinition(cursor);
-	if (HasClass(className) || !IsOnFilter(file) || !isDefinition)
-		return CXChildVisit_Continue;
-
-	ClassInfo& classInfo = (mClasses[className] = ClassInfo{ .Name = className });
-	classInfo.DefinedIn = file;
-	classInfo.Comment = GetCommentForCursor(cursor);
-	classInfo.IsDefinition = isDefinition;
-	visitingData.mParents.push_back(&classInfo);
+	unsigned numDiagnostics = clang_getNumDiagnostics(TranslationUnit);
+	for (unsigned i = 0; i < numDiagnostics; ++i) {
+		CXDiagnostic diag = clang_getDiagnostic(TranslationUnit, i);
+		CXDiagnosticSeverity severity = clang_getDiagnosticSeverity(diag);
+		if (severity != CXDiagnostic_Error && severity != CXDiagnostic_Fatal)
+			continue;
+		return true;
+	}
+	return false;
+}
+std::vector<CXCursor> HeaderParser::GetMethodsInClass(CXCursor classCursor)
+{
+	std::vector<CXCursor> methods;
 	clang_visitChildren(
-		cursor,
+		classCursor,
 		[](CXCursor c, CXCursor parent, CXClientData client_data) {
-			ClassVisitingData& data = *reinterpret_cast<ClassVisitingData*>(client_data);
+			auto& methods = *reinterpret_cast<std::vector<CXCursor>*>(client_data);
 			CXCursorKind kind = clang_getCursorKind(c);
-			if (kind == CXCursor_CXXBaseSpecifier) {
-				auto type = clang_getCursorType(c);
-				auto typeDecl = clang_getTypeDeclaration(type);
-				auto baseName = data.mParser.GetClassFullName(typeDecl);
-				auto filePath = data.mParser.GetFilePathForCursor(typeDecl);
-				if (data.mParents.size() > 0)
-					data.mParents.back()->BaseClassNames.push_back(baseName);
-				
-				return data.mParser.VisitClass(typeDecl, baseName, *filePath, data);
-			}
-			else if (kind == CXCursor_CXXMethod || kind == CXCursor_Destructor) {
-				auto mangledName = data.mParser.GetFunctionMangledName(c);
-				auto filePath = data.mParser.GetFilePathForCursor(c);
-				FunctionVisitingData visData{ .mParser = data.mParser, .mClassData = data };
-				return data.mParser.VisitFunction(c, mangledName, visData);
+			if (kind == CXCursor_CXXMethod || kind == CXCursor_Constructor || kind == CXCursor_Destructor) {
+				methods.push_back(c);
 			}
 			return CXChildVisit_Continue;
 		},
-		&visitingData
+		&methods
 	);
+	return methods;
+}
+std::vector<CXCursor> HeaderParser::GetBaseClassesOfClass(CXCursor classCursor)
+{
+	std::vector<CXCursor> bases;
+	clang_visitChildren(
+		classCursor,
+		[](CXCursor c, CXCursor parent, CXClientData client_data) {
+			auto& bases = *reinterpret_cast<std::vector<CXCursor>*>(client_data);
+			CXCursorKind kind = clang_getCursorKind(c);
+			if (kind == CXCursor_CXXBaseSpecifier) {
+				CXType type = clang_getCursorType(c);
+				CXCursor declaration = clang_getTypeDeclaration(type);
+				declaration = clang_getCanonicalCursor(declaration);
+				declaration = clang_getCursorDefinition(declaration);
+				if (!clang_Cursor_isNull(declaration))
+					bases.push_back(declaration);
+			}
+			return CXChildVisit_Continue;
+		},
+		&bases
+	);
+	return bases;
+}
 
-	visitingData.mParents.pop_back();
+void HeaderParser::VisitAll()
+{
+	CXCursor rootCursor = clang_getTranslationUnitCursor(TranslationUnit);
+	clang_visitChildren(
+		rootCursor,
+		[](CXCursor c, CXCursor parent, CXClientData client_data) {
+			auto cursorHash = clang_hashCursor(c);
+			HeaderParser& parser = *reinterpret_cast<HeaderParser*>(client_data);
+			CXCursorKind kind = clang_getCursorKind(c);
+			auto location = parser.GetCursorLocation(c);
+
+			if (!location || !parser.IsOnFilter(location->FilePath))
+				return CXChildVisit_Continue;
+
+			if (kind == CXCursor_ClassDecl || kind == CXCursor_StructDecl) {
+				ClassVisitingData data{ .mParser = parser, .mParents = {} };
+				return parser.VisitClass(c, data);
+			}
+			else if (kind == CXCursor_FunctionDecl) {
+				FunctionVisitingData data{ .mParser = parser, .mClassData = nullptr };
+				return parser.VisitMethod(c, data);
+			}
+			return CXChildVisit_Recurse;
+		},
+		this
+	);
+}
+
+CXChildVisitResult HeaderParser::VisitClass(CXCursor cursor, ClassVisitingData& data)
+{
+	std::string usr = GetCursorUSR(cursor);
+	if (WasDefinitionVisited(usr) || HasClass(usr))
+		return CXChildVisit_Continue;
+
+	bool isDefinition = clang_isCursorDefinition(cursor);
+	if (!isDefinition)
+		return CXChildVisit_Continue;
+	
+	VisitedDefinitions.insert(usr);
+	ClassInfo& classInfo = (Classes[usr] = ClassInfo{});
+	classInfo.USR = usr;
+	classInfo.Name = GetClassName(cursor);
+	classInfo.Location = GetCursorLocation(cursor);
+	classInfo.RawComment = GetCommentForCursor(cursor);
+	classInfo.IsDefinition = isDefinition;
+
+	auto baseClasses = GetBaseClassesOfClass(cursor);
+	for (const auto& baseCursor : baseClasses) {
+		std::string baseUsr = GetCursorUSR(baseCursor);
+		classInfo.BaseClassUSRs.push_back(baseUsr);
+	}
+
+	auto methods = GetMethodsInClass(cursor);
+	for (const auto& methodCursor : methods) {
+		std::string methodUsr = GetCursorUSR(methodCursor);
+		FunctionVisitingData funcData{ .mParser = data.mParser, .mClassData = &data };
+		VisitMethod(methodCursor, funcData);
+		classInfo.MethodUSRs.push_back(methodUsr);
+	}
+
 	return CXChildVisit_Continue;
 }
 
-CXChildVisitResult HeaderParser::VisitFunction(CXCursor cursor, const std::string& mangledName, FunctionVisitingData& data)
+CXChildVisitResult HeaderParser::VisitMethod(CXCursor cursor, FunctionVisitingData& data)
 {
-	if (HasFunction(mangledName)) {
+	std::string usr = GetCursorUSR(cursor);
+	if (WasDefinitionVisited(usr) || HasFunction(usr))
 		return CXChildVisit_Continue;
-	}
 
-	FunctionInfo& functionInfo = (data.mParser.mFunctions[mangledName] = FunctionInfo{ .MangledName = mangledName });
-	bool isDestructor = clang_getCursorKind(cursor) == CXCursor_Destructor;
-	functionInfo.Comment = data.mParser.GetCommentForCursor(cursor);
-	functionInfo.ShortName = data.mParser.GetFunctionShortName(cursor);
-	functionInfo.IsDestructor = isDestructor;
-	data.mClassData.mParents.back()->FunctionNames.push_back(mangledName);
-	if (clang_CXXMethod_isVirtual(cursor)) {
-		CXCursor* overridenCursors;
-		unsigned int numOverridenCursors;
-		clang_getOverriddenCursors(cursor, &overridenCursors, &numOverridenCursors);
-		if (numOverridenCursors > 0) {
-			auto overridenName = data.mParser.GetFunctionMangledName(overridenCursors[0]);
-			functionInfo.OverrideOfName = overridenName;
-		}
+	VisitedDefinitions.insert(usr);
+	MethodInfo& methodInfo = (Methods[usr] = MethodInfo{});
+	methodInfo.USR = usr;
+	methodInfo.MangledName = GetFunctionMangledName(cursor);
+	methodInfo.ShortName = GetFunctionShortName(cursor);
+	methodInfo.Location = GetCursorLocation(cursor);
+	methodInfo.RawComment = GetCommentForCursor(cursor);
+	methodInfo.IsDestructor = clang_getCursorKind(cursor) == CXCursor_Destructor;
+	methodInfo.IsVirtual = clang_CXXMethod_isVirtual(cursor);
+	methodInfo.IsExternal = clang_Cursor_isExternalSymbol(cursor, nullptr, nullptr, nullptr);
+	methodInfo.HasBody = HasFunctionBody(cursor);
 
-		functionInfo.IsVirtual = true;
+	bool isImported = false;
+	clang_visitChildren(
+		cursor,
+		[](CXCursor c, CXCursor parent, CXClientData client_data) {
+			bool& isImport = *reinterpret_cast<bool*>(client_data);
+			CXCursorKind kind = clang_getCursorKind(c);
+			if (kind == CXCursor_DLLImport) {
+				isImport = true;
+				return CXChildVisit_Break;
+			}
+			return CXChildVisit_Continue;
+		},
+		&isImported
+	);
+
+	methodInfo.IsImported = isImported;
+
+	CXCursor* overriden;
+	uint32_t numOverriden;
+	clang_getOverriddenCursors(cursor, &overriden, &numOverriden);
+	if (numOverriden > 0) {
+		auto baseUsr = GetCursorUSR(overriden[0]);
+		methodInfo.OverrideOfUSR = baseUsr;
 	}
 	return CXChildVisit_Continue;
 }

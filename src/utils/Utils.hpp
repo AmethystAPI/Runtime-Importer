@@ -3,8 +3,13 @@
 #include <fstream>
 #include <iostream>
 #include <format>
-#include "PathUtils.hpp"
+#include <regex>
+
 #include "xxhash/xxhash.h"
+
+#include "utils/PathUtils.hpp"
+#include "parsing/metadata/ClassInfo.hpp"
+#include "parsing/CursorLocation.hpp"
 
 class Utils {
 public:
@@ -39,4 +44,26 @@ public:
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
         std::cout << std::format("[Benchmark] {} took {} ms\n", name, duration);
 	}
+
+    static bool HasSymbolGenerationMarker(const fs::path& path) {
+        std::ifstream file(path);
+        if (!file)
+            return false;
+        std::string content((std::istreambuf_iterator<char>(file)),
+            std::istreambuf_iterator<char>());
+
+        std::regex marker(R"(\/\/\/\s*@symgen)");
+        if (!std::regex_search(content, marker))
+            return false;
+        return true;
+    }
+
+    static bool IsFileInIncludes(const fs::path& file, const fs::path& input, const std::vector<fs::path>& includes) {
+        auto definedInRelative = fs::relative(file, input);
+        for (auto& inc : includes) {
+            if (inc == definedInRelative)
+                return true;
+        }
+		return false;
+    }
 };

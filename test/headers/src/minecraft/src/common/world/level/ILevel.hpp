@@ -120,1039 +120,1039 @@ class TickingAreaList;
 enum class ParticleType : int {};
 class BlockPalette;
 
-/// @vPointer {0xDEADBEEF, this}
+/// @VirtualTable {0xDEADBEEF, this}
 class ILevel : public Bedrock::EnableNonOwnerReferences {
 public:
     /**@vIndex {0}*/
-    virtual ~ILevel();
+    __declspec(dllimport) virtual ~ILevel();
 
     /**@vIndex {1}*/
-    virtual bool initialize(const std::string&, const LevelSettings&, LevelData*, const Experiments&, const std::string*);
+    __declspec(dllimport) virtual bool initialize(const std::string&, const LevelSettings&, LevelData*, const Experiments&, const std::string*);
 
     /**@vIndex {2}*/
-    virtual void startLeaveGame();
+    __declspec(dllimport) virtual void startLeaveGame();
 
     /**@vIndex {3}*/
-    virtual bool isLeaveGameDone();
+    __declspec(dllimport) virtual bool isLeaveGameDone();
 
     /**@vIndex {4}*/
-    virtual WeakRef<Dimension> getOrCreateDimension(DimensionType);
+    __declspec(dllimport) virtual WeakRef<Dimension> getOrCreateDimension(DimensionType);
 
     /**@vIndex {5}*/
-    virtual WeakRef<Dimension> getDimension(DimensionType) const;
+    __declspec(dllimport) virtual WeakRef<Dimension> getDimension(DimensionType) const;
 
     /**
     * @vIndex {6}
     * @brief Validates that the DimensionType != Undefined, in that case resets it to the Overworld
     */
-    virtual DimensionType getLastOrDefaultSpawnDimensionId(DimensionType) const;
+    __declspec(dllimport) virtual DimensionType getLastOrDefaultSpawnDimensionId(DimensionType) const;
 
     /**@vIndex {7}*/
-    virtual void _unknown_7();
+    __declspec(dllimport) virtual void _unknown_7();
 
     /**@vIndex {8}*/
-    virtual void _unknown_8();
+    __declspec(dllimport) virtual void _unknown_8();
 
     /**@vIndex {9}*/
-    virtual void _unknown_9();
+    __declspec(dllimport) virtual void _unknown_9();
 
     /**@vIndex {10}*/
-    virtual void _unknown_10();
+    __declspec(dllimport) virtual void _unknown_10();
 
     /**@vIndex {11}*/
-    virtual unsigned int getChunkTickRange() const;
+    __declspec(dllimport) virtual unsigned int getChunkTickRange() const;
 
     /**@vIndex {12}*/
-    virtual const ChunkTickRangeManager& getChunkTickRangeManager() const;
+    __declspec(dllimport) virtual const ChunkTickRangeManager& getChunkTickRangeManager() const;
 
     /**@vIndex {13}*/
-    virtual PortalForcer& getPortalForcer();
+    __declspec(dllimport) virtual PortalForcer& getPortalForcer();
 
     /**@vIndex {14}*/
-    virtual void requestPlayerChangeDimension(Player&, ChangeDimensionRequest&&);
+    __declspec(dllimport) virtual void requestPlayerChangeDimension(Player&, ChangeDimensionRequest&&);
 
     /**@vIndex {15}*/
-    virtual void entityChangeDimension(Actor&, DimensionType, std::optional<Vec3>);
+    __declspec(dllimport) virtual void entityChangeDimension(Actor&, DimensionType, std::optional<Vec3>);
 
     /**@vIndex {16}*/
-    virtual Spawner& getSpawner() const;
+    __declspec(dllimport) virtual Spawner& getSpawner() const;
 
     /**@vIndex {17}*/
-    virtual gsl::not_null<Bedrock::NonOwnerPointer<BossEventSubscriptionManager>> getBossEventSubscriptionManager();
+    __declspec(dllimport) virtual gsl::not_null<Bedrock::NonOwnerPointer<BossEventSubscriptionManager>> getBossEventSubscriptionManager();
 
     /**@vIndex {18}*/
-    virtual ProjectileFactory& getProjectileFactory() const;
+    __declspec(dllimport) virtual ProjectileFactory& getProjectileFactory() const;
 
     /**@vIndex {19}*/
-    virtual ActorDefinitionGroup* getEntityDefinitions() const;
+    __declspec(dllimport) virtual ActorDefinitionGroup* getEntityDefinitions() const;
 
     /**@vIndex {20}*/
-    virtual gsl::not_null<Bedrock::NonOwnerPointer<ActorAnimationGroup>> getActorAnimationGroup() const;
+    __declspec(dllimport) virtual gsl::not_null<Bedrock::NonOwnerPointer<ActorAnimationGroup>> getActorAnimationGroup() const;
 
     /**@vIndex {21}*/
-    virtual Bedrock::NonOwnerPointer<ActorAnimationControllerGroup> getActorAnimationControllerGroup() const;
+    __declspec(dllimport) virtual Bedrock::NonOwnerPointer<ActorAnimationControllerGroup> getActorAnimationControllerGroup() const;
 
     /**@vIndex {22}*/
-    virtual BlockDefinitionGroup* getBlockDefinitions() const;
+    __declspec(dllimport) virtual BlockDefinitionGroup* getBlockDefinitions() const;
 
     /**@vIndex {23}*/
-    virtual void _unknown_23();
+    __declspec(dllimport) virtual void _unknown_23();
 
     /**@vIndex {24}*/
-    virtual void _unknown_24();
+    __declspec(dllimport) virtual void _unknown_24();
 
     /**@vIndex {25}*/
-    virtual PropertyGroupManager& getActorPropertyGroup() const;
+    __declspec(dllimport) virtual PropertyGroupManager& getActorPropertyGroup() const;
 
     /**@vIndex {26}*/
-    virtual void _unknown_26();
+    __declspec(dllimport) virtual void _unknown_26();
 
     /**@vIndex {27}*/
-    virtual void _unknown_27();
+    __declspec(dllimport) virtual void _unknown_27();
 
     /**@vIndex {28}*/
-    virtual bool getDisablePlayerInteractions() const;
+    __declspec(dllimport) virtual bool getDisablePlayerInteractions() const;
 
     /**@vIndex {29}*/
-    virtual void setDisablePlayerInteractions(bool);
+    __declspec(dllimport) virtual void setDisablePlayerInteractions(bool);
 
     /**@vIndex {30}*/
-    virtual AutomationBehaviorTreeGroup& getAutomationBehaviorTreeGroup() const;
+    __declspec(dllimport) virtual AutomationBehaviorTreeGroup& getAutomationBehaviorTreeGroup() const;
 
     /**@vIndex {31}*/
-    virtual BehaviorFactory& getBehaviorFactory() const;
+    __declspec(dllimport) virtual BehaviorFactory& getBehaviorFactory() const;
 
     /**@vIndex {32}*/
-    virtual Difficulty getDifficulty() const;
+    __declspec(dllimport) virtual Difficulty getDifficulty() const;
 
     /**@vIndex {33}*/
-    virtual InternalComponentRegistry& getInternalComponentRegistry() const;
+    __declspec(dllimport) virtual InternalComponentRegistry& getInternalComponentRegistry() const;
 
     /**@vIndex {34}*/
-    virtual DimensionConversionData getDimensionConversionData() const;
+    __declspec(dllimport) virtual DimensionConversionData getDimensionConversionData() const;
 
     /**@vIndex {35}*/
-    virtual float getSpecialMultiplier(DimensionType) const;
+    __declspec(dllimport) virtual float getSpecialMultiplier(DimensionType) const;
 
     /**@vIndex {36}*/
-    virtual bool hasCommandsEnabled() const;
+    __declspec(dllimport) virtual bool hasCommandsEnabled() const;
 
     /**@vIndex {37}*/
-    virtual bool useMsaGamertagsOnly() const;
+    __declspec(dllimport) virtual bool useMsaGamertagsOnly() const;
 
     /**@vIndex {38}*/
-    virtual void setMsaGamertagsOnly(bool);
+    __declspec(dllimport) virtual void setMsaGamertagsOnly(bool);
 
     /**@vIndex {39}*/
-    virtual Actor* addEntity(BlockSource&, OwnerPtr<EntityContext>);
+    __declspec(dllimport) virtual Actor* addEntity(BlockSource&, OwnerPtr<EntityContext>);
 
     /**@vIndex {40}*/
-    virtual Actor* addGlobalEntity(BlockSource&, OwnerPtr<EntityContext>);
+    __declspec(dllimport) virtual Actor* addGlobalEntity(BlockSource&, OwnerPtr<EntityContext>);
 
     /**@vIndex {41}*/
-    virtual Actor* addAutonomousEntity(BlockSource&, OwnerPtr<EntityContext>);
+    __declspec(dllimport) virtual Actor* addAutonomousEntity(BlockSource&, OwnerPtr<EntityContext>);
 
     /**@vIndex {42}*/
-    virtual void addUser(OwnerPtr<EntityContext>);
+    __declspec(dllimport) virtual void addUser(OwnerPtr<EntityContext>);
 
     /**@vIndex {43}*/
-    virtual Actor* addDisplayEntity(BlockSource&, OwnerPtr<EntityContext>);
+    __declspec(dllimport) virtual Actor* addDisplayEntity(BlockSource&, OwnerPtr<EntityContext>);
 
     /**@vIndex {44}*/
-    virtual void removeDisplayEntity(WeakEntityRef);
+    __declspec(dllimport) virtual void removeDisplayEntity(WeakEntityRef);
 
     /**@vIndex {45}*/
-    virtual void suspendPlayer(Player&);
+    __declspec(dllimport) virtual void suspendPlayer(Player&);
 
     /**@vIndex {46}*/
-    virtual void resumePlayer(Player&);
+    __declspec(dllimport) virtual void resumePlayer(Player&);
 
     /**@vIndex {47}*/
-    virtual bool isPlayerSuspended(Player&) const;
+    __declspec(dllimport) virtual bool isPlayerSuspended(Player&) const;
 
     /**@vIndex {48}*/
-    virtual OwnerPtr<EntityContext> removeActorAndTakeEntity(WeakEntityRef);
+    __declspec(dllimport) virtual OwnerPtr<EntityContext> removeActorAndTakeEntity(WeakEntityRef);
 
     /**@vIndex {49}*/
-    virtual OwnerPtr<EntityContext> removeActorFromWorldAndTakeEntity(WeakEntityRef);
+    __declspec(dllimport) virtual OwnerPtr<EntityContext> removeActorFromWorldAndTakeEntity(WeakEntityRef);
 
     /**@vIndex {50}*/
-    virtual OwnerPtr<EntityContext> takeEntity(WeakEntityRef, LevelChunk&);
+    __declspec(dllimport) virtual OwnerPtr<EntityContext> takeEntity(WeakEntityRef, LevelChunk&);
 
     /**@vIndex {51}*/
-    virtual StrictEntityContext fetchStrictEntity(ActorUniqueID, bool) const;
+    __declspec(dllimport) virtual StrictEntityContext fetchStrictEntity(ActorUniqueID, bool) const;
 
     /**@vIndex {52}*/
-    virtual Actor* fetchEntity(ActorUniqueID, bool) const;
+    __declspec(dllimport) virtual Actor* fetchEntity(ActorUniqueID, bool) const;
 
     /**@vIndex {53}*/
-    virtual Actor* getRuntimeEntity(ActorRuntimeID, bool) const;
+    __declspec(dllimport) virtual Actor* getRuntimeEntity(ActorRuntimeID, bool) const;
 
     /**@vIndex {54}*/
-    virtual Mob* getMob(ActorUniqueID) const;
+    __declspec(dllimport) virtual Mob* getMob(ActorUniqueID) const;
 
     /**@vIndex {55}*/
-    virtual Player* getPlayer(ActorUniqueID) const;
+    __declspec(dllimport) virtual Player* getPlayer(ActorUniqueID) const;
 
     /**@vIndex {56}*/
-    virtual Player* getPlayer(const mce::UUID&) const;
+    __declspec(dllimport) virtual Player* getPlayer(const mce::UUID&) const;
 
     /**@vIndex {57}*/
-    virtual Player* getPlayer(const std::string&) const;
+    __declspec(dllimport) virtual Player* getPlayer(const std::string&) const;
 
     /**@vIndex {58}*/
-    virtual Player* getPlayerByXuid(const std::string&) const;
+    __declspec(dllimport) virtual Player* getPlayerByXuid(const std::string&) const;
 
     /**@vIndex {59}*/
-    virtual Player* getPlatformPlayer(const std::string&) const;
+    __declspec(dllimport) virtual Player* getPlatformPlayer(const std::string&) const;
 
     /**@vIndex {60}*/
-    virtual Player* getPlayerFromServerId(const std::string&) const;
+    __declspec(dllimport) virtual Player* getPlayerFromServerId(const std::string&) const;
 
     /**@vIndex {61}*/
-    virtual Player* getRuntimePlayer(ActorRuntimeID) const;
+    __declspec(dllimport) virtual Player* getRuntimePlayer(ActorRuntimeID) const;
 
     /**@vIndex {62}*/
-    virtual int getNumRemotePlayers();
+    __declspec(dllimport) virtual int getNumRemotePlayers();
 
     /**@vIndex {63}*/
-    virtual Player* getPrimaryLocalPlayer() const;
+    __declspec(dllimport) virtual Player* getPrimaryLocalPlayer() const;
 
     /**@vIndex {64}*/
-    virtual IMinecraftEventing& getEventing();
+    __declspec(dllimport) virtual IMinecraftEventing& getEventing();
 
     /**@vIndex {65}*/
-    virtual mce::Color getPlayerColor(const Player&) const;
+    __declspec(dllimport) virtual mce::Color getPlayerColor(const Player&) const;
 
     /**@vIndex {66}*/
-    virtual const Tick& getCurrentTick() const;
+    __declspec(dllimport) virtual const Tick& getCurrentTick() const;
 
     /**@vIndex {67}*/
-    virtual const Tick getCurrentServerTick() const;
+    __declspec(dllimport) virtual const Tick getCurrentServerTick() const;
 
     /**@vIndex {68}*/
-    virtual void _unknown_68();
+    __declspec(dllimport) virtual void _unknown_68();
 
     /**@vIndex {69}*/
-    virtual void _unknown_69();
+    __declspec(dllimport) virtual void _unknown_69();
 
     /**@vIndex {70}*/
-    virtual BlockPalette& getBlockPalette() const;
+    __declspec(dllimport) virtual BlockPalette& getBlockPalette() const;
 
     /**@vIndex {71}*/
-    virtual void _unknown_71();
+    __declspec(dllimport) virtual void _unknown_71();
 
     /**@vIndex {72}*/
-    virtual void _unknown_72();
+    __declspec(dllimport) virtual void _unknown_72();
 
     /**@vIndex {73}*/
-    virtual void _unknown_73();
+    __declspec(dllimport) virtual void _unknown_73();
 
     /**@vIndex {74}*/
-    virtual void _unknown_74();
+    __declspec(dllimport) virtual void _unknown_74();
 
     /**@vIndex {75}*/
-    virtual void _unknown_75();
+    __declspec(dllimport) virtual void _unknown_75();
 
     /**@vIndex {76}*/
-    virtual void _unknown_76();
+    __declspec(dllimport) virtual void _unknown_76();
 
     /**@vIndex {77}*/
-    virtual void _unknown_77();
+    __declspec(dllimport) virtual void _unknown_77();
 
     /**@vIndex {78}*/
-    virtual gsl::not_null<Bedrock::NonOwnerPointer<StructureManager>> getStructureManager();
+    __declspec(dllimport) virtual gsl::not_null<Bedrock::NonOwnerPointer<StructureManager>> getStructureManager();
 
     /**@vIndex {79}*/
-    virtual const gsl::not_null<Bedrock::NonOwnerPointer<StructureManager>> getStructureManager() const;
+    __declspec(dllimport) virtual const gsl::not_null<Bedrock::NonOwnerPointer<StructureManager>> getStructureManager() const;
 
     /**@vIndex {80}*/
-    virtual void _unknown_80();
+    __declspec(dllimport) virtual void _unknown_80();
 
     /**@vIndex {81}*/
-    virtual void _unknown_81();
+    __declspec(dllimport) virtual void _unknown_81();
 
     /**@vIndex {82}*/
-    virtual void _unknown_82();
+    __declspec(dllimport) virtual void _unknown_82();
 
     /**@vIndex {83}*/
-    virtual void _unknown_83();
+    __declspec(dllimport) virtual void _unknown_83();
 
     /**@vIndex {84}*/
-    virtual BiomeManager& getBiomeManager();
+    __declspec(dllimport) virtual BiomeManager& getBiomeManager();
 
     /**@vIndex {85}*/
-    virtual const BiomeManager& getBiomeManager() const;
+    __declspec(dllimport) virtual const BiomeManager& getBiomeManager() const;
 
     /**@vIndex {86}*/
-    virtual void _unknown_86();
+    __declspec(dllimport) virtual void _unknown_86();
 
     /**@vIndex {87}*/
-    virtual void _unknown_87();
+    __declspec(dllimport) virtual void _unknown_87();
 
     /**@vIndex {88}*/
-    virtual void _unknown_88();
+    __declspec(dllimport) virtual void _unknown_88();
 
     /**@vIndex {89}*/
-    virtual void _unknown_89();
+    __declspec(dllimport) virtual void _unknown_89();
 
     /**@vIndex {90}*/
-    virtual void _unknown_90();
+    __declspec(dllimport) virtual void _unknown_90();
 
     /**@vIndex {91}*/
-    virtual void _unknown_91();
+    __declspec(dllimport) virtual void _unknown_91();
 
     /**@vIndex {92}*/
-    virtual void addListener(LevelListener&);
+    __declspec(dllimport) virtual void addListener(LevelListener&);
 
     /**@vIndex {93}*/
-    virtual void removeListener(LevelListener&);
+    __declspec(dllimport) virtual void removeListener(LevelListener&);
 
     /**@vIndex {94}*/
-    virtual void tickEntities();
+    __declspec(dllimport) virtual void tickEntities();
 
     /**@vIndex {95}*/
-    virtual void tickEntitySystems();
+    __declspec(dllimport) virtual void tickEntitySystems();
 
     /**@vIndex {96}*/
-    virtual void _unknown_96();
+    __declspec(dllimport) virtual void _unknown_96();
 
     /**@vIndex {97}*/
-    virtual void _unknown_97();
+    __declspec(dllimport) virtual void _unknown_97();
 
     /**@vIndex {98}*/
-    virtual void onPlayerDeath(Player&, const ActorDamageSource&);
+    __declspec(dllimport) virtual void onPlayerDeath(Player&, const ActorDamageSource&);
 
     /**@vIndex {99}*/
-    virtual void tick();
+    __declspec(dllimport) virtual void tick();
 
     /**@vIndex {100}*/
-    virtual bool explode(Explosion&);
+    __declspec(dllimport) virtual bool explode(Explosion&);
 
     /**@vIndex {101}*/
-    virtual bool explode(BlockSource&, Actor*, const Vec3&, float, bool, bool, float, bool);
+    __declspec(dllimport) virtual bool explode(BlockSource&, Actor*, const Vec3&, float, bool, bool, float, bool);
 
     /**@vIndex {102}*/
-    virtual void spawnParticleEffect(const std::string&, const Vec3&, Dimension*);
+    __declspec(dllimport) virtual void spawnParticleEffect(const std::string&, const Vec3&, Dimension*);
 
     /**@vIndex {103}*/
-    virtual void denyEffect(BlockSource&, const Vec3&);
+    __declspec(dllimport) virtual void denyEffect(BlockSource&, const Vec3&);
 
     /**@vIndex {104}*/
-    virtual void potionSplash(const Vec3&, const mce::Color&, bool);
+    __declspec(dllimport) virtual void potionSplash(const Vec3&, const mce::Color&, bool);
 
     /**@vIndex {105}*/
-    virtual bool extinguishFire(BlockSource&, const BlockPos&, unsigned char, Actor*);
+    __declspec(dllimport) virtual bool extinguishFire(BlockSource&, const BlockPos&, unsigned char, Actor*);
 
     /**@vIndex {106}*/
-    virtual std::unique_ptr<Path> findPath(Actor&, Actor&, NavigationComponent&);
+    __declspec(dllimport) virtual std::unique_ptr<Path> findPath(Actor&, Actor&, NavigationComponent&);
 
     /**@vIndex {107}*/
-    virtual std::unique_ptr<Path> findPath(Actor&, int, int, int, NavigationComponent&);
+    __declspec(dllimport) virtual std::unique_ptr<Path> findPath(Actor&, int, int, int, NavigationComponent&);
 
     /**@vIndex {108}*/
-    virtual void updateSleepingPlayerList();
+    __declspec(dllimport) virtual void updateSleepingPlayerList();
 
     /**@vIndex {109}*/
-    virtual void setSleepStatus(const PlayerSleepStatus&);
+    __declspec(dllimport) virtual void setSleepStatus(const PlayerSleepStatus&);
 
     /**@vIndex {110}*/
-    virtual PlayerSleepStatus getSleepStatus() const;
+    __declspec(dllimport) virtual PlayerSleepStatus getSleepStatus() const;
 
     /**@vIndex {111}*/
-    virtual int getTime() const;
+    __declspec(dllimport) virtual int getTime() const;
 
     /**@vIndex {112}*/
-    virtual void setTime(int);
+    __declspec(dllimport) virtual void setTime(int);
 
     /**@vIndex {113}*/
-    virtual unsigned int getSeed();
+    __declspec(dllimport) virtual unsigned int getSeed();
 
     /**@vIndex {114}*/
-    virtual const BlockPos& getDefaultSpawn() const;
+    __declspec(dllimport) virtual const BlockPos& getDefaultSpawn() const;
 
     /**@vIndex {115}*/
-    virtual void setDefaultSpawn(const BlockPos&);
+    __declspec(dllimport) virtual void setDefaultSpawn(const BlockPos&);
 
     /**@vIndex {116}*/
-    virtual void _unknown_116();
+    __declspec(dllimport) virtual void _unknown_116();
 
     /**@vIndex {117}*/
-    virtual void setDefaultGameType(GameType);
+    __declspec(dllimport) virtual void setDefaultGameType(GameType);
 
     /**@vIndex {118}*/
-    virtual GameType getDefaultGameType() const;
+    __declspec(dllimport) virtual GameType getDefaultGameType() const;
 
     /**@vIndex {119}*/
-    virtual void setDifficulty(Difficulty);
+    __declspec(dllimport) virtual void setDifficulty(Difficulty);
 
     /**@vIndex {120}*/
-    virtual void setMultiplayerGameIntent(bool);
+    __declspec(dllimport) virtual void setMultiplayerGameIntent(bool);
 
     /**@vIndex {121}*/
-    virtual bool getMultiplayerGameIntent() const;
+    __declspec(dllimport) virtual bool getMultiplayerGameIntent() const;
 
     /**@vIndex {122}*/
-    virtual void setMultiplayerGame(bool);
+    __declspec(dllimport) virtual void setMultiplayerGame(bool);
 
     /**@vIndex {123}*/
-    virtual bool isMultiplayerGame() const;
+    __declspec(dllimport) virtual bool isMultiplayerGame() const;
 
     /**@vIndex {124}*/
-    virtual void setLANBroadcastIntent(bool);
+    __declspec(dllimport) virtual void setLANBroadcastIntent(bool);
 
     /**@vIndex {125}*/
-    virtual bool getLANBroadcastIntent() const;
+    __declspec(dllimport) virtual bool getLANBroadcastIntent() const;
 
     /**@vIndex {126}*/
-    virtual void setLANBroadcast(bool);
+    __declspec(dllimport) virtual void setLANBroadcast(bool);
 
     /**@vIndex {127}*/
-    virtual bool getLANBroadcast() const;
+    __declspec(dllimport) virtual bool getLANBroadcast() const;
 
     /**@vIndex {128}*/
-    virtual void setXBLBroadcastIntent(Social::GamePublishSetting);
+    __declspec(dllimport) virtual void setXBLBroadcastIntent(Social::GamePublishSetting);
 
     /**@vIndex {129}*/
-    virtual Social::GamePublishSetting getXBLBroadcastIntent() const;
+    __declspec(dllimport) virtual Social::GamePublishSetting getXBLBroadcastIntent() const;
 
     /**@vIndex {130}*/
-    virtual bool hasXBLBroadcastIntent() const;
+    __declspec(dllimport) virtual bool hasXBLBroadcastIntent() const;
 
     /**@vIndex {131}*/
-    virtual void setXBLBroadcastMode(Social::GamePublishSetting);
+    __declspec(dllimport) virtual void setXBLBroadcastMode(Social::GamePublishSetting);
 
     /**@vIndex {132}*/
-    virtual Social::GamePublishSetting getXBLBroadcastMode() const;
+    __declspec(dllimport) virtual Social::GamePublishSetting getXBLBroadcastMode() const;
 
     /**@vIndex {133}*/
-    virtual bool hasXBLBroadcast() const;
+    __declspec(dllimport) virtual bool hasXBLBroadcast() const;
 
     /**@vIndex {134}*/
-    virtual void setPlatformBroadcastIntent(Social::GamePublishSetting);
+    __declspec(dllimport) virtual void setPlatformBroadcastIntent(Social::GamePublishSetting);
 
     /**@vIndex {135}*/
-    virtual Social::GamePublishSetting getPlatformBroadcastIntent() const;
+    __declspec(dllimport) virtual Social::GamePublishSetting getPlatformBroadcastIntent() const;
 
     /**@vIndex {136}*/
-    virtual bool hasPlatformBroadcastIntent() const;
+    __declspec(dllimport) virtual bool hasPlatformBroadcastIntent() const;
 
     /**@vIndex {137}*/
-    virtual void setPlatformBroadcastMode(Social::GamePublishSetting);
+    __declspec(dllimport) virtual void setPlatformBroadcastMode(Social::GamePublishSetting);
 
     /**@vIndex {138}*/
-    virtual Social::GamePublishSetting getPlatformBroadcastMode() const;
+    __declspec(dllimport) virtual Social::GamePublishSetting getPlatformBroadcastMode() const;
 
     /**@vIndex {139}*/
-    virtual bool hasPlatformBroadcast() const;
+    __declspec(dllimport) virtual bool hasPlatformBroadcast() const;
 
     /**@vIndex {140}*/
-    virtual void setHasLockedBehaviorPack(bool);
+    __declspec(dllimport) virtual void setHasLockedBehaviorPack(bool);
 
     /**@vIndex {141}*/
-    virtual void setHasLockedResourcePack(bool);
+    __declspec(dllimport) virtual void setHasLockedResourcePack(bool);
 
     /**@vIndex {142}*/
-    virtual void setCommandsEnabled(bool);
+    __declspec(dllimport) virtual void setCommandsEnabled(bool);
 
     /**@vIndex {143}*/
-    virtual void setWorldTemplateOptionsUnlocked();
+    __declspec(dllimport) virtual void setWorldTemplateOptionsUnlocked();
 
     /**@vIndex {144}*/
-    virtual bool hasLevelStorage() const;
+    __declspec(dllimport) virtual bool hasLevelStorage() const;
 
     /**@vIndex {145}*/
-    virtual void _unknown_145();
+    __declspec(dllimport) virtual void _unknown_145();
 
     /**@vIndex {146}*/
-    virtual void _unknown_146();
+    __declspec(dllimport) virtual void _unknown_146();
 
     /**@vIndex {147}*/
-    virtual LevelData& getLevelData();
+    __declspec(dllimport) virtual LevelData& getLevelData();
 
     /**@vIndex {148}*/
-    virtual const LevelData& getLevelData() const;
+    __declspec(dllimport) virtual const LevelData& getLevelData() const;
 
     /**@vIndex {149}*/
-    virtual PhotoStorage& getPhotoStorage();
+    __declspec(dllimport) virtual PhotoStorage& getPhotoStorage();
 
     /**@vIndex {150}*/
-    virtual void createPhotoStorage();
+    __declspec(dllimport) virtual void createPhotoStorage();
 
     /**@vIndex {151}*/
-    virtual void setEducationLevelSettings(EducationLevelSettings);
+    __declspec(dllimport) virtual void setEducationLevelSettings(EducationLevelSettings);
 
     /**@vIndex {152}*/
-    virtual const std::optional<EducationLevelSettings>& getEducationLevelSettings() const;
+    __declspec(dllimport) virtual const std::optional<EducationLevelSettings>& getEducationLevelSettings() const;
 
     /**@vIndex {153}*/
-    virtual void save();
+    __declspec(dllimport) virtual void save();
 
     /**@vIndex {154}*/
-    virtual void saveLevelData();
+    __declspec(dllimport) virtual void saveLevelData();
 
     /**@vIndex {155}*/
-    virtual void saveGameData();
+    __declspec(dllimport) virtual void saveGameData();
 
     /**@vIndex {156}*/
-    virtual std::shared_ptr<void*> requestTimedStorageDeferment();
+    __declspec(dllimport) virtual std::shared_ptr<void*> requestTimedStorageDeferment();
 
     /**@vIndex {157}*/
-    virtual TickingAreasManager& getTickingAreasMgr();
+    __declspec(dllimport) virtual TickingAreasManager& getTickingAreasMgr();
 
     /**@vIndex {158}*/
-    virtual void addTickingAreaList(DimensionType, const std::shared_ptr<TickingAreaList>&);
+    __declspec(dllimport) virtual void addTickingAreaList(DimensionType, const std::shared_ptr<TickingAreaList>&);
 
     /**@vIndex {159}*/
-    virtual void sendServerLegacyParticle(ParticleType, const Vec3&, const Vec3&, int);
+    __declspec(dllimport) virtual void sendServerLegacyParticle(ParticleType, const Vec3&, const Vec3&, int);
 
     /**@vIndex {160}*/
-    virtual void playSound(DimensionType, Puv::Legacy::LevelSoundEvent, const Vec3&, int, const ActorDefinitionIdentifier&, bool, bool);
+    __declspec(dllimport) virtual void playSound(DimensionType, Puv::Legacy::LevelSoundEvent, const Vec3&, int, const ActorDefinitionIdentifier&, bool, bool);
 
     /**@vIndex {161}*/
-    virtual void playSound(const IConstBlockSource&, Puv::Legacy::LevelSoundEvent, const Vec3&, int, const ActorDefinitionIdentifier&, bool, bool);
+    __declspec(dllimport) virtual void playSound(const IConstBlockSource&, Puv::Legacy::LevelSoundEvent, const Vec3&, int, const ActorDefinitionIdentifier&, bool, bool);
 
     /**@vIndex {162}*/
-    virtual void playSound(const std::string&, const Vec3&, float, float);
+    __declspec(dllimport) virtual void playSound(const std::string&, const Vec3&, float, float);
 
     /**@vIndex {163}*/
-    virtual void playSound(Puv::Legacy::LevelSoundEvent, const Vec3&, float, float);
+    __declspec(dllimport) virtual void playSound(Puv::Legacy::LevelSoundEvent, const Vec3&, float, float);
 
     /**@vIndex {164}*/
-    virtual void playSound(Puv::Legacy::LevelSoundEvent, const Vec3&, int, const ActorDefinitionIdentifier&, bool, bool);
+    __declspec(dllimport) virtual void playSound(Puv::Legacy::LevelSoundEvent, const Vec3&, int, const ActorDefinitionIdentifier&, bool, bool);
 
     /**@vIndex {165}*/
-    virtual PlayerEventCoordinator& getRemotePlayerEventCoordinator();
+    __declspec(dllimport) virtual PlayerEventCoordinator& getRemotePlayerEventCoordinator();
 
     /**@vIndex {166}*/
-    virtual ServerPlayerEventCoordinator& getServerPlayerEventCoordinator();
+    __declspec(dllimport) virtual ServerPlayerEventCoordinator& getServerPlayerEventCoordinator();
 
     /**@vIndex {167}*/
-    virtual ClientPlayerEventCoordinator& getClientPlayerEventCoordinator();
+    __declspec(dllimport) virtual ClientPlayerEventCoordinator& getClientPlayerEventCoordinator();
 
     /**@vIndex {168}*/
-    virtual ActorEventCoordinator& getActorEventCoordinator();
+    __declspec(dllimport) virtual ActorEventCoordinator& getActorEventCoordinator();
 
     /**@vIndex {169}*/
-    virtual BlockEventCoordinator& getBlockEventCoordinator();
+    __declspec(dllimport) virtual BlockEventCoordinator& getBlockEventCoordinator();
 
     /**@vIndex {170}*/
-    virtual ItemEventCoordinator& getItemEventCoordinator();
+    __declspec(dllimport) virtual ItemEventCoordinator& getItemEventCoordinator();
 
     /**@vIndex {171}*/
-    virtual ServerNetworkEventCoordinator& getServerNetworkEventCoordinator();
+    __declspec(dllimport) virtual ServerNetworkEventCoordinator& getServerNetworkEventCoordinator();
 
     /**@vIndex {172}*/
-    virtual ScriptingEventCoordinator& getScriptingEventCoordinator();
+    __declspec(dllimport) virtual ScriptingEventCoordinator& getScriptingEventCoordinator();
 
     /**@vIndex {173}*/
-    virtual ScriptDeferredEventCoordinator& getScriptDeferredEventCoordinator();
+    __declspec(dllimport) virtual ScriptDeferredEventCoordinator& getScriptDeferredEventCoordinator();
 
     /**@vIndex {174}*/
-    virtual LevelEventCoordinator& getLevelEventCoordinator();
+    __declspec(dllimport) virtual LevelEventCoordinator& getLevelEventCoordinator();
 
     /**@vIndex {175}*/
-    virtual void handleLevelEvent(LevelEvent, const CompoundTag&);
+    __declspec(dllimport) virtual void handleLevelEvent(LevelEvent, const CompoundTag&);
 
     /**@vIndex {176}*/
-    virtual void handleLevelEvent(LevelEvent, const Vec3&, int);
+    __declspec(dllimport) virtual void handleLevelEvent(LevelEvent, const Vec3&, int);
 
     /**@vIndex {177}*/
-    virtual void handleStopSoundEvent(const std::string&);
+    __declspec(dllimport) virtual void handleStopSoundEvent(const std::string&);
 
     /**@vIndex {178}*/
-    virtual void handleStopAllSounds();
+    __declspec(dllimport) virtual void handleStopAllSounds();
 
     /**@vIndex {179}*/
-    virtual void broadcastLevelEvent(LevelEvent, const CompoundTag&, const UserEntityIdentifierComponent*);
+    __declspec(dllimport) virtual void broadcastLevelEvent(LevelEvent, const CompoundTag&, const UserEntityIdentifierComponent*);
 
     /**@vIndex {180}*/
-    virtual void broadcastLevelEvent(LevelEvent, const Vec3&, int, const UserEntityIdentifierComponent*);
+    __declspec(dllimport) virtual void broadcastLevelEvent(LevelEvent, const Vec3&, int, const UserEntityIdentifierComponent*);
 
     /**@vIndex {181}*/
-    virtual void broadcastLocalEvent(BlockSource&, LevelEvent, const Vec3&, const Block&);
+    __declspec(dllimport) virtual void broadcastLocalEvent(BlockSource&, LevelEvent, const Vec3&, const Block&);
 
     /**@vIndex {182}*/
-    virtual void broadcastLocalEvent(BlockSource&, LevelEvent, const Vec3&, int);
+    __declspec(dllimport) virtual void broadcastLocalEvent(BlockSource&, LevelEvent, const Vec3&, int);
 
     /**@vIndex {183}*/
-    virtual void broadcastSoundEvent(Dimension&, Puv::Legacy::LevelSoundEvent, const Vec3&, int, const ActorDefinitionIdentifier&, bool, bool);
+    __declspec(dllimport) virtual void broadcastSoundEvent(Dimension&, Puv::Legacy::LevelSoundEvent, const Vec3&, int, const ActorDefinitionIdentifier&, bool, bool);
 
     /**@vIndex {184}*/
-    virtual void broadcastSoundEvent(BlockSource&, Puv::Legacy::LevelSoundEvent, const Vec3&, int, const ActorDefinitionIdentifier&, bool, bool);
+    __declspec(dllimport) virtual void broadcastSoundEvent(BlockSource&, Puv::Legacy::LevelSoundEvent, const Vec3&, int, const ActorDefinitionIdentifier&, bool, bool);
 
     /**@vIndex {185}*/
-    virtual void broadcastSoundEvent(BlockSource&, Puv::Legacy::LevelSoundEvent, const Vec3&, const Block&, const ActorDefinitionIdentifier&, bool, bool);
+    __declspec(dllimport) virtual void broadcastSoundEvent(BlockSource&, Puv::Legacy::LevelSoundEvent, const Vec3&, const Block&, const ActorDefinitionIdentifier&, bool, bool);
 
     /**@vIndex {186}*/
-    virtual void broadcastActorEvent(Actor&, ActorEvent, int) const;
+    __declspec(dllimport) virtual void broadcastActorEvent(Actor&, ActorEvent, int) const;
 
     /**@vIndex {187}*/
-    virtual void addChunkViewTracker(std::weak_ptr<ChunkViewSource>);
+    __declspec(dllimport) virtual void addChunkViewTracker(std::weak_ptr<ChunkViewSource>);
 
     /**@vIndex {188}*/
-    virtual void onChunkReload(const Bounds&);
+    __declspec(dllimport) virtual void onChunkReload(const Bounds&);
 
     /**@vIndex {189}*/
-    virtual void onChunkReloaded(ChunkSource&, LevelChunk&);
+    __declspec(dllimport) virtual void onChunkReloaded(ChunkSource&, LevelChunk&);
 
     /**@vIndex {190}*/
-    virtual int getActivePlayerCount() const;
+    __declspec(dllimport) virtual int getActivePlayerCount() const;
 
     /**@vIndex {191}*/
-    virtual int getActiveUsersCount() const;
+    __declspec(dllimport) virtual int getActiveUsersCount() const;
 
     /**@vIndex {192}*/
-    virtual void forEachPlayer(std::function<bool(const Player&)>) const;
+    __declspec(dllimport) virtual void forEachPlayer(std::function<bool(const Player&)>) const;
 
     /**@vIndex {193}*/
-    virtual void forEachPlayer(std::function<bool(Player&)>);
+    __declspec(dllimport) virtual void forEachPlayer(std::function<bool(Player&)>);
 
     /**@vIndex {194}*/
-    virtual void forEachUser(std::function<bool(const EntityContext&)>) const;
+    __declspec(dllimport) virtual void forEachUser(std::function<bool(const EntityContext&)>) const;
 
     /**@vIndex {195}*/
-    virtual void forEachUser(std::function<bool(EntityContext&)>);
+    __declspec(dllimport) virtual void forEachUser(std::function<bool(EntityContext&)>);
 
     /**@vIndex {196}*/
-    virtual Player* findPlayer(std::function<bool(const WeakEntityRef&)>) const;
+    __declspec(dllimport) virtual Player* findPlayer(std::function<bool(const WeakEntityRef&)>) const;
 
     /**@vIndex {197}*/
-    virtual Player* findPlayer(std::function<bool(const Player&)>) const;
+    __declspec(dllimport) virtual Player* findPlayer(std::function<bool(const Player&)>) const;
 
     /**@vIndex {198}*/
-    virtual int getUserCount() const;
+    __declspec(dllimport) virtual int getUserCount() const;
 
     /**@vIndex {199}*/
-    virtual int countUsersWithMatchingNetworkId(const NetworkIdentifier&) const;
+    __declspec(dllimport) virtual int countUsersWithMatchingNetworkId(const NetworkIdentifier&) const;
 
     /**@vIndex {200}*/
-    virtual const std::vector<OwnerPtr<EntityContext>>& getUsers() const;
+    __declspec(dllimport) virtual const std::vector<OwnerPtr<EntityContext>>& getUsers() const;
 
     /**@vIndex {201}*/
-    virtual const std::vector<OwnerPtr<EntityContext>>& getEntities() const;
+    __declspec(dllimport) virtual const std::vector<OwnerPtr<EntityContext>>& getEntities() const;
 
     /**@vIndex {202}*/
-    virtual void _unknown_202();
+    __declspec(dllimport) virtual void _unknown_202();
 
     /**@vIndex {203}*/
-    virtual void onChunkLoaded(ChunkSource&, LevelChunk&);
+    __declspec(dllimport) virtual void onChunkLoaded(ChunkSource&, LevelChunk&);
 
     /**@vIndex {204}*/
-    virtual void onChunkDiscarded(LevelChunk&);
+    __declspec(dllimport) virtual void onChunkDiscarded(LevelChunk&);
 
     /**@vIndex {205}*/
-    virtual void _unknown_205();
+    __declspec(dllimport) virtual void _unknown_205();
 
     /**@vIndex {206}*/
-    virtual void queueEntityDestruction(OwnerPtr<EntityContext>);
+    __declspec(dllimport) virtual void queueEntityDestruction(OwnerPtr<EntityContext>);
 
     /**@vIndex {207}*/
-    virtual OwnerPtr<EntityContext> removeEntity(WeakEntityRef);
+    __declspec(dllimport) virtual OwnerPtr<EntityContext> removeEntity(WeakEntityRef);
 
     /**@vIndex {208}*/
-    virtual OwnerPtr<EntityContext> removeEntity(Actor&);
+    __declspec(dllimport) virtual OwnerPtr<EntityContext> removeEntity(Actor&);
 
     /**@vIndex {209}*/
-    virtual void forceRemoveEntity(Actor&);
+    __declspec(dllimport) virtual void forceRemoveEntity(Actor&);
 
     /**@vIndex {210}*/
-    virtual void forceRemoveEntityfromWorld(Actor&);
+    __declspec(dllimport) virtual void forceRemoveEntityfromWorld(Actor&);
 
     /**@vIndex {211}*/
-    virtual void forceFlushRemovedPlayers();
+    __declspec(dllimport) virtual void forceFlushRemovedPlayers();
 
     /**@vIndex {212}*/
-    virtual void _unknown_212();
+    __declspec(dllimport) virtual void _unknown_212();
 
     /**@vIndex {213}*/
-    virtual void levelCleanupQueueEntityRemoval(OwnerPtr<EntityContext>);
+    __declspec(dllimport) virtual void levelCleanupQueueEntityRemoval(OwnerPtr<EntityContext>);
 
     /**@vIndex {214}*/
-    virtual void registerTemporaryPointer(_TickPtr&);
+    __declspec(dllimport) virtual void registerTemporaryPointer(_TickPtr&);
 
     /**@vIndex {215}*/
-    virtual void unregisterTemporaryPointer(_TickPtr&);
+    __declspec(dllimport) virtual void unregisterTemporaryPointer(_TickPtr&);
 
     /**@vIndex {216}*/
-    virtual bool destroyBlock(BlockSource&, const BlockPos&, bool);
+    __declspec(dllimport) virtual bool destroyBlock(BlockSource&, const BlockPos&, bool);
 
     /**@vIndex {217}*/
-    virtual void upgradeStorageVersion(StorageVersion);
+    __declspec(dllimport) virtual void upgradeStorageVersion(StorageVersion);
 
     /**@vIndex {218}*/
-    virtual void suspendAndSave();
+    __declspec(dllimport) virtual void suspendAndSave();
 
     /**@vIndex {219}*/
-    virtual Particle* addParticle(ParticleType, const Vec3&, const Vec3&, int, const CompoundTag*, bool);
+    __declspec(dllimport) virtual Particle* addParticle(ParticleType, const Vec3&, const Vec3&, int, const CompoundTag*, bool);
 
     /**@vIndex {220}*/
-    virtual void _destroyEffect(const BlockPos&, const Block&, int);
+    __declspec(dllimport) virtual void _destroyEffect(const BlockPos&, const Block&, int);
 
     /**@vIndex {221}*/
-    virtual void addParticleEffect(const HashedString&, const Vec3&, const MolangVariableMap&);
+    __declspec(dllimport) virtual void addParticleEffect(const HashedString&, const Vec3&, const MolangVariableMap&);
 
     /**@vIndex {222}*/
-    virtual void addTerrainParticleEffect(const BlockPos&, const Block&, const Vec3&, float, float, float);
+    __declspec(dllimport) virtual void addTerrainParticleEffect(const BlockPos&, const Block&, const Vec3&, float, float, float);
 
     /**@vIndex {223}*/
-    virtual void addTerrainSlideEffect(const BlockPos&, const Block&, const Vec3&, float, float, float);
+    __declspec(dllimport) virtual void addTerrainSlideEffect(const BlockPos&, const Block&, const Vec3&, float, float, float);
 
     /**@vIndex {224}*/
-    virtual void addBreakingItemParticleEffect(const Vec3&, ParticleType, const ResolvedItemIconInfo&);
+    __declspec(dllimport) virtual void addBreakingItemParticleEffect(const Vec3&, ParticleType, const ResolvedItemIconInfo&);
 
     /**@vIndex {225}*/
-    virtual ActorUniqueID getNewUniqueID();
+    __declspec(dllimport) virtual ActorUniqueID getNewUniqueID();
 
     /**@vIndex {226}*/
-    virtual ActorRuntimeID getNextRuntimeID();
+    __declspec(dllimport) virtual ActorRuntimeID getNextRuntimeID();
 
     /**@vIndex {227}*/
-    virtual const std::vector<ChunkPos>& getTickingOffsets() const;
+    __declspec(dllimport) virtual const std::vector<ChunkPos>& getTickingOffsets() const;
 
     /**@vIndex {228}*/
-    virtual const std::vector<ChunkPos>& getClientTickingOffsets() const;
+    __declspec(dllimport) virtual const std::vector<ChunkPos>& getClientTickingOffsets() const;
 
     /**@vIndex {229}*/
-    virtual std::vector<ChunkPos> getSortedPositionsFromClientOffsets(const std::vector<ChunkPos>&) const;
+    __declspec(dllimport) virtual std::vector<ChunkPos> getSortedPositionsFromClientOffsets(const std::vector<ChunkPos>&) const;
 
     /**@vIndex {230}*/
-    virtual bool isExporting() const;
+    __declspec(dllimport) virtual bool isExporting() const;
 
     /**@vIndex {231}*/
-    virtual void setIsExporting(bool);
+    __declspec(dllimport) virtual void setIsExporting(bool);
 
     /**@vIndex {232}*/
-    virtual SavedDataStorage& getSavedData();
+    __declspec(dllimport) virtual SavedDataStorage& getSavedData();
 
     /**@vIndex {233}*/
-    virtual void _unknown_233();
+    __declspec(dllimport) virtual void _unknown_233();
 
     /**@vIndex {234}*/
-    virtual void _unknown_234();
+    __declspec(dllimport) virtual void _unknown_234();
 
     /**@vIndex {235}*/
-    virtual MapItemSavedData* getMapSavedData(ActorUniqueID);
+    __declspec(dllimport) virtual MapItemSavedData* getMapSavedData(ActorUniqueID);
 
     /**@vIndex {236}*/
-    virtual void requestMapInfo(ActorUniqueID, bool);
+    __declspec(dllimport) virtual void requestMapInfo(ActorUniqueID, bool);
 
     /**@vIndex {237}*/
-    virtual ActorUniqueID expandMapByID(ActorUniqueID, bool);
+    __declspec(dllimport) virtual ActorUniqueID expandMapByID(ActorUniqueID, bool);
 
     /**@vIndex {238}*/
-    virtual bool copyAndLockMap(ActorUniqueID, ActorUniqueID);
+    __declspec(dllimport) virtual bool copyAndLockMap(ActorUniqueID, ActorUniqueID);
 
     /**@vIndex {239}*/
-    virtual MapItemSavedData& createMapSavedData(const std::vector<ActorUniqueID>&, const BlockPos&, DimensionType, int);
+    __declspec(dllimport) virtual MapItemSavedData& createMapSavedData(const std::vector<ActorUniqueID>&, const BlockPos&, DimensionType, int);
 
     /**@vIndex {240}*/
-    virtual MapItemSavedData& createMapSavedData(const ActorUniqueID&, const BlockPos&, DimensionType, int);
+    __declspec(dllimport) virtual MapItemSavedData& createMapSavedData(const ActorUniqueID&, const BlockPos&, DimensionType, int);
 
     /**@vIndex {241}*/
-    virtual Core::PathBuffer<std::string> getScreenshotsFolder() const;
+    __declspec(dllimport) virtual Core::PathBuffer<std::string> getScreenshotsFolder() const;
 
     /**@vIndex {242}*/
-    virtual std::string getLevelId() const;
+    __declspec(dllimport) virtual std::string getLevelId() const;
 
     /**@vIndex {243}*/
-    virtual void setLevelId(std::string);
+    __declspec(dllimport) virtual void setLevelId(std::string);
 
     /**@vIndex {244}*/
-    virtual TaskGroup& getSyncTasksGroup();
+    __declspec(dllimport) virtual TaskGroup& getSyncTasksGroup();
 
     /**@vIndex {245}*/
-    virtual TaskGroup& getIOTasksGroup();
+    __declspec(dllimport) virtual TaskGroup& getIOTasksGroup();
 
     /**@vIndex {246}*/
-    virtual void _unknown_246();
+    __declspec(dllimport) virtual void _unknown_246();
 
     /**@vIndex {247}*/
-    virtual void _unknown_247();
+    __declspec(dllimport) virtual void _unknown_247();
 
     /**@vIndex {248}*/
-    virtual void _unknown_248();
+    __declspec(dllimport) virtual void _unknown_248();
 
     /**@vIndex {249}*/
-    virtual void _unknown_249();
+    __declspec(dllimport) virtual void _unknown_249();
 
     /**@vIndex {250}*/
-    virtual void _unknown_250();
+    __declspec(dllimport) virtual void _unknown_250();
 
     /**@vIndex {251}*/
-    virtual bool isEdu() const;
+    __declspec(dllimport) virtual bool isEdu() const;
 
     /**@vIndex {252}*/
-    virtual void _unknown_252();
+    __declspec(dllimport) virtual void _unknown_252();
 
     /**@vIndex {253}*/
-    virtual void _unknown_253();
+    __declspec(dllimport) virtual void _unknown_253();
 
     /**@vIndex {254}*/
-    virtual ActorInfoRegistry* getActorInfoRegistry();
+    __declspec(dllimport) virtual ActorInfoRegistry* getActorInfoRegistry();
 
     /**@vIndex {255}*/
-    //virtual StackRefResult<const EntityRegistry> getEntityRegistry() const;
-    virtual void _unknown_255();
+    //__declspec(dllimport) virtual StackRefResult<const EntityRegistry> getEntityRegistry() const;
+    __declspec(dllimport) virtual void _unknown_255();
 
     /**@vIndex {256}*/
-    //virtual StackRefResult<EntityRegistry> getEntityRegistry();
-    virtual void _unknown_256();
+    //__declspec(dllimport) virtual StackRefResult<EntityRegistry> getEntityRegistry();
+    __declspec(dllimport) virtual void _unknown_256();
 
     /**@vIndex {257}*/
-    virtual EntitySystems& getEntitySystems();
+    __declspec(dllimport) virtual EntitySystems& getEntitySystems();
 
     /**@vIndex {258}*/
-    virtual WeakRef<EntityContext> getLevelEntity();
+    __declspec(dllimport) virtual WeakRef<EntityContext> getLevelEntity();
 
     /**@vIndex {259}*/
-    virtual void _unknown_259();
+    __declspec(dllimport) virtual void _unknown_259();
 
     /**@vIndex {260}*/
-    virtual void _unknown_260();
+    __declspec(dllimport) virtual void _unknown_260();
 
     /**@vIndex {261}*/
-    virtual const PlayerCapabilities::ISharedController& getCapabilities() const;
+    __declspec(dllimport) virtual const PlayerCapabilities::ISharedController& getCapabilities() const;
 
     /**@vIndex {262}*/
-    //virtual TagRegistry<IDType<LevelTagIDType>, IDType<LevelTagSetIDType>>& getTagRegistry();
-    virtual void _unknown_262();
+    //__declspec(dllimport) virtual TagRegistry<IDType<LevelTagIDType>, IDType<LevelTagSetIDType>>& getTagRegistry();
+    __declspec(dllimport) virtual void _unknown_262();
 
     /**@vIndex {263}*/
-    virtual const PlayerMovementSettings& getPlayerMovementSettings() const;
+    __declspec(dllimport) virtual const PlayerMovementSettings& getPlayerMovementSettings() const;
 
     /**@vIndex {264}*/
-    virtual void setPlayerMovementSettings(const PlayerMovementSettings&);
+    __declspec(dllimport) virtual void setPlayerMovementSettings(const PlayerMovementSettings&);
 
     /**@vIndex {265}*/
-    virtual bool canUseSkin(const SerializedSkin&, const NetworkIdentifier&, const mce::UUID&, const ActorUniqueID&) const;
+    __declspec(dllimport) virtual bool canUseSkin(const SerializedSkin&, const NetworkIdentifier&, const mce::UUID&, const ActorUniqueID&) const;
 
     /**@vIndex {266}*/
-    virtual PositionTrackingDB::PositionTrackingDBClient* getPositionTrackerDBClient() const;
+    __declspec(dllimport) virtual PositionTrackingDB::PositionTrackingDBClient* getPositionTrackerDBClient() const;
 
     /**@vIndex {267}*/
-    virtual void _unknown_267();
+    __declspec(dllimport) virtual void _unknown_267();
 
     /**@vIndex {268}*/
-    virtual void flushRunTimeLighting();
+    __declspec(dllimport) virtual void flushRunTimeLighting();
 
     /**@vIndex {269}*/
-    virtual void loadBlockDefinitionGroup(const Experiments&);
+    __declspec(dllimport) virtual void loadBlockDefinitionGroup(const Experiments&);
 
     /**@vIndex {270}*/
-    virtual void initializeBlockDefinitionGroup();
+    __declspec(dllimport) virtual void initializeBlockDefinitionGroup();
 
     /**@vIndex {271}*/
-    virtual Bedrock::NonOwnerPointer<IUnknownBlockTypeRegistry> getUnknownBlockTypeRegistry();
+    __declspec(dllimport) virtual Bedrock::NonOwnerPointer<IUnknownBlockTypeRegistry> getUnknownBlockTypeRegistry();
 
     /**@vIndex {272}*/
-    virtual bool isClientSide() const;
+    __declspec(dllimport) virtual bool isClientSide() const;
 
     /**@vIndex {273}*/
-    virtual void _unknown_273();
+    __declspec(dllimport) virtual void _unknown_273();
 
     /**@vIndex {274}*/
-    virtual void _unknown_274();
+    __declspec(dllimport) virtual void _unknown_274();
 
     /**@vIndex {275}*/
-    virtual const std::string& getPlayerXUID(const mce::UUID&) const;
+    __declspec(dllimport) virtual const std::string& getPlayerXUID(const mce::UUID&) const;
 
     /**@vIndex {276}*/
-    virtual const std::string& getPlayerPlatformOnlineId(const mce::UUID&) const;
+    __declspec(dllimport) virtual const std::string& getPlayerPlatformOnlineId(const mce::UUID&) const;
 
     /**@vIndex {277}*/
-    virtual const std::vector<WeakEntityRef>& getActiveUsers() const;
+    __declspec(dllimport) virtual const std::vector<WeakEntityRef>& getActiveUsers() const;
 
     /**@vIndex {278}*/
-    virtual std::vector<Actor*> getRuntimeActorList() const;
+    __declspec(dllimport) virtual std::vector<Actor*> getRuntimeActorList() const;
 
     /**@vIndex {279}*/
-    virtual void _unknown_279();
+    __declspec(dllimport) virtual void _unknown_279();
 
     /**@vIndex {280}*/
-    virtual void _unknown_280();
+    __declspec(dllimport) virtual void _unknown_280();
 
     /**@vIndex {281}*/
-    virtual PacketSender* getPacketSender() const;
+    __declspec(dllimport) virtual PacketSender* getPacketSender() const;
 
     /**@vIndex {282}*/
-    virtual void setPacketSender(PacketSender*);
+    __declspec(dllimport) virtual void setPacketSender(PacketSender*);
 
     /**@vIndex {283}*/
-    virtual Bedrock::NonOwnerPointer<NetEventCallback> getNetEventCallback() const;
+    __declspec(dllimport) virtual Bedrock::NonOwnerPointer<NetEventCallback> getNetEventCallback() const;
 
     /**@vIndex {284}*/
-    virtual void setNetEventCallback(Bedrock::NonOwnerPointer<NetEventCallback>);
+    __declspec(dllimport) virtual void setNetEventCallback(Bedrock::NonOwnerPointer<NetEventCallback>);
 
     /**@vIndex {285}*/
-    virtual void _unknown_285();
+    __declspec(dllimport) virtual void _unknown_285();
 
     /**@vIndex {286}*/
-    virtual void _unknown_286();
+    __declspec(dllimport) virtual void _unknown_286();
 
     /**@vIndex {287}*/
-    virtual void _unknown_287();
+    __declspec(dllimport) virtual void _unknown_287();
 
     /**@vIndex {288}*/
-    virtual HitResult& getHitResult();
+    __declspec(dllimport) virtual HitResult& getHitResult();
 
     /**@vIndex {289}*/
-    virtual HitResult& getLiquidHitResult();
+    __declspec(dllimport) virtual HitResult& getLiquidHitResult();
 
     /**@vIndex {290}*/
-    virtual const std::string& getImmersiveReaderString() const;
+    __declspec(dllimport) virtual const std::string& getImmersiveReaderString() const;
 
     /**@vIndex {291}*/
-    virtual void setImmersiveReaderString(std::string);
+    __declspec(dllimport) virtual void setImmersiveReaderString(std::string);
 
     /**@vIndex {292}*/
-    virtual const AdventureSettings& getAdventureSettings() const;
+    __declspec(dllimport) virtual const AdventureSettings& getAdventureSettings() const;
 
     /**@vIndex {293}*/
-    virtual AdventureSettings& getAdventureSettings();
+    __declspec(dllimport) virtual AdventureSettings& getAdventureSettings();
 
     /**@vIndex {294}*/
-    virtual GameRules& getGameRules();
+    __declspec(dllimport) virtual GameRules& getGameRules();
 
     /**@vIndex {295}*/
-    virtual const GameRules& getGameRules() const;
+    __declspec(dllimport) virtual const GameRules& getGameRules() const;
 
     /**@vIndex {296}*/
-    virtual bool hasStartWithMapEnabled() const;
+    __declspec(dllimport) virtual bool hasStartWithMapEnabled() const;
 
     /**@vIndex {297}*/
-    virtual bool isEditorWorld() const;
+    __declspec(dllimport) virtual bool isEditorWorld() const;
 
     /**@vIndex {298}*/
-    virtual Abilities& getDefaultAbilities();
+    __declspec(dllimport) virtual Abilities& getDefaultAbilities();
 
     /**@vIndex {299}*/
-    virtual const PermissionsHandler& getDefaultPermissions() const;
+    __declspec(dllimport) virtual const PermissionsHandler& getDefaultPermissions() const;
 
     /**@vIndex {300}*/
-    virtual PermissionsHandler& getDefaultPermissions();
+    __declspec(dllimport) virtual PermissionsHandler& getDefaultPermissions();
 
     /**@vIndex {301}*/
-    virtual bool getTearingDown() const;
+    __declspec(dllimport) virtual bool getTearingDown() const;
 
     /**@vIndex {302}*/
-    virtual void takePicture(cg::ImageBuffer&, Actor*, Actor*, ScreenshotOptions&);
+    __declspec(dllimport) virtual void takePicture(cg::ImageBuffer&, Actor*, Actor*, ScreenshotOptions&);
 
     /**@vIndex {303}*/
-    virtual gsl::not_null<Bedrock::NonOwnerPointer<LevelSoundManager>> getLevelSoundManager();
+    __declspec(dllimport) virtual gsl::not_null<Bedrock::NonOwnerPointer<LevelSoundManager>> getLevelSoundManager();
 
     /**@vIndex {304}*/
-    virtual gsl::not_null<Bedrock::NonOwnerPointer<SoundPlayerInterface>> getSoundPlayer() const;
+    __declspec(dllimport) virtual gsl::not_null<Bedrock::NonOwnerPointer<SoundPlayerInterface>> getSoundPlayer() const;
 
     /**@vIndex {305}*/
-    virtual void setSimPaused(bool);
+    __declspec(dllimport) virtual void setSimPaused(bool);
 
     /**@vIndex {306}*/
-    virtual bool getSimPaused();
+    __declspec(dllimport) virtual bool getSimPaused();
 
     /**@vIndex {307}*/
-    virtual void setFinishedInitializing();
+    __declspec(dllimport) virtual void setFinishedInitializing();
 
     /**@vIndex {308}*/
-    virtual LootTables& getLootTables();
+    __declspec(dllimport) virtual LootTables& getLootTables();
 
     /**@vIndex {309}*/
-    virtual void updateWeather(float, int, float, int);
+    __declspec(dllimport) virtual void updateWeather(float, int, float, int);
 
     /**@vIndex {310}*/
-    virtual int getNetherScale() const;
+    __declspec(dllimport) virtual int getNetherScale() const;
 
     /**@vIndex {311}*/
-    virtual void _unknown_311();
+    __declspec(dllimport) virtual void _unknown_311();
 
     /**@vIndex {312}*/
-    virtual void _unknown_312();
+    __declspec(dllimport) virtual void _unknown_312();
 
     /**@vIndex {313}*/
-    virtual void _unknown_313();
+    __declspec(dllimport) virtual void _unknown_313();
 
     /**@vIndex {314}*/
-    virtual LayeredAbilities* getPlayerAbilities(const ActorUniqueID&);
+    __declspec(dllimport) virtual LayeredAbilities* getPlayerAbilities(const ActorUniqueID&);
 
     /**@vIndex {315}*/
-    virtual void setPlayerAbilities(const ActorUniqueID&, const LayeredAbilities&);
+    __declspec(dllimport) virtual void setPlayerAbilities(const ActorUniqueID&, const LayeredAbilities&);
 
     /**@vIndex {316}*/
-    virtual void sendAllPlayerAbilities(const Player&);
+    __declspec(dllimport) virtual void sendAllPlayerAbilities(const Player&);
 
     /**@vIndex {317}*/
-    virtual Recipes& getRecipes() const;
+    __declspec(dllimport) virtual Recipes& getRecipes() const;
 
     /**@vIndex {318}*/
-    virtual BlockReducer* getBlockReducer() const;
+    __declspec(dllimport) virtual BlockReducer* getBlockReducer() const;
 
     /**@vIndex {319}*/
-    virtual void _unknown_319();
+    __declspec(dllimport) virtual void _unknown_319();
 
     /**@vIndex {320}*/
-    virtual void _unknown_320();
+    __declspec(dllimport) virtual void _unknown_320();
 
     /**@vIndex {321}*/
-    virtual void _unknown_321();
+    __declspec(dllimport) virtual void _unknown_321();
 
     /**@vIndex {322}*/
-    virtual void _unknown_322();
+    __declspec(dllimport) virtual void _unknown_322();
 
     /**@vIndex {323}*/
-    virtual void digestServerItemComponents(const ItemComponentPacket&);
+    __declspec(dllimport) virtual void digestServerItemComponents(const ItemComponentPacket&);
 
     /**@vIndex {324}*/
-    virtual const BlockLegacy& getRegisteredBorderBlock() const;
+    __declspec(dllimport) virtual const BlockLegacy& getRegisteredBorderBlock() const;
 
     /**@vIndex {325}*/
-    virtual bool use3DBiomeMaps() const;
+    __declspec(dllimport) virtual bool use3DBiomeMaps() const;
 
     /**@vIndex {326}*/
-    virtual void addBlockSourceForValidityTracking(BlockSource*);
+    __declspec(dllimport) virtual void addBlockSourceForValidityTracking(BlockSource*);
 
     /**@vIndex {327}*/
-    virtual void removeBlockSourceFromValidityTracking(BlockSource*);
+    __declspec(dllimport) virtual void removeBlockSourceFromValidityTracking(BlockSource*);
 
     /**@vIndex {328}*/
-    virtual Level* asLevel();
+    __declspec(dllimport) virtual Level* asLevel();
 
     /**@vIndex {329}*/
-    virtual void _unknown_329();
+    __declspec(dllimport) virtual void _unknown_329();
 
     /**@vIndex {330}*/
-    virtual bool isClientSideGenerationEnabled();
+    __declspec(dllimport) virtual bool isClientSideGenerationEnabled();
 
     /**@vIndex {331}*/
-    virtual bool blockNetworkIdsAreHashes();
+    __declspec(dllimport) virtual bool blockNetworkIdsAreHashes();
 
     /**@vIndex {332}*/
-    virtual ItemRegistryRef getItemRegistry() const;
+    __declspec(dllimport) virtual ItemRegistryRef getItemRegistry() const;
 
     /**@vIndex {333}*/
-    virtual std::weak_ptr<BlockTypeRegistry> getBlockRegistry() const;
+    __declspec(dllimport) virtual std::weak_ptr<BlockTypeRegistry> getBlockRegistry() const;
 
     /**@vIndex {334}*/
-    virtual void pauseAndFlushTaskGroups();
+    __declspec(dllimport) virtual void pauseAndFlushTaskGroups();
 
     /**@vIndex {335}*/
-    virtual void _unknown_335();
+    __declspec(dllimport) virtual void _unknown_335();
 
     /**@vIndex {336}*/
-    virtual void _unknown_336();
+    __declspec(dllimport) virtual void _unknown_336();
 
     /**@vIndex {337}*/
-    virtual void _unknown_337();
+    __declspec(dllimport) virtual void _unknown_337();
 
     /**@vIndex {338}*/
-    virtual void _unknown_338();
+    __declspec(dllimport) virtual void _unknown_338();
 
     /**@vIndex {339}*/
-    virtual void _unknown_339();
+    __declspec(dllimport) virtual void _unknown_339();
 
 protected:
     /**@vIndex {340}*/
-    virtual void _subTick();
+    __declspec(dllimport) virtual void _subTick();
 
-    /**@vIndex {341}*/
-    virtual void _initializeMapDataManager();
+    /// @VirtualIndex {0, this}
+    __declspec(dllimport) virtual void _initializeMapDataManager();
 };

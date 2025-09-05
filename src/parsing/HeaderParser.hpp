@@ -1,51 +1,56 @@
 #pragma once
 #include <vector>
 #include <string>
-#include "clang-c/Index.h"
 #include <filesystem>
 #include <unordered_map>
 #include <unordered_set>
 #include <stack>
-#include "ClassInfo.hpp"
-#include "FunctionInfo.hpp"
+
+#include "clang-c/Index.h"
+
+#include "parsing/metadata/ClassInfo.hpp"
+#include "parsing/metadata/MethodInfo.hpp"
+#include "parsing/CursorLocation.hpp"
+
 namespace fs = std::filesystem;
-
-struct ParsingData {
-	fs::path mInputDirectory;
-};
-
-class HeaderParser;
-struct ClassVisitingData {
-	HeaderParser& mParser;
-	std::vector<ClassInfo*> mParents;
-};
-
-struct FunctionVisitingData {
-	HeaderParser& mParser;
-	ClassVisitingData& mClassData;
-};
 
 class HeaderParser {
 public:
-	fs::path MainDirectory;
-	CXIndex mIndex;
-	CXTranslationUnit mTranslationUnit;
-	std::vector<fs::path> mPathFilters;
-	ParsingData mParsingData;
+	struct ParserContext {
+		fs::path InputDirectory;
+	};
 
-	std::unordered_map<std::string, std::string> mClassNameCache;
-	std::unordered_map<std::string, std::string> mClassFullNameCache;
-	std::unordered_map<std::string, std::string> mFunctionMangledNameCache;
-	std::unordered_map<std::string, std::string> mFunctionShortNameCache;
-	std::unordered_map<std::string, std::string> mCommentsCache;
-	std::unordered_map<std::string, fs::path> mHeaderPathCache;
-	std::unordered_map<std::string, fs::path> mHeaderRelativePathCache;
-	std::unordered_map<fs::path, bool> mShouldProcessCache;
+	struct ClassVisitingData {
+		HeaderParser& mParser;
+		std::vector<ClassInfo*> mParents;
+	};
 
-	std::unordered_map<std::string, ClassInfo> mClasses;
-	std::unordered_map<std::string, FunctionInfo> mFunctions;
+	struct FunctionVisitingData {
+		HeaderParser& mParser;
+		ClassVisitingData* mClassData;
+	};
 
-	HeaderParser(const fs::path& mainDir, const std::string& file, const std::vector<const char*>& arguments, unsigned int flags, const ParsingData& data, const std::vector<fs::path>& pathFilters = {});
+	CXIndex Index;
+	CXTranslationUnit TranslationUnit;
+	std::vector<fs::path> PathFilters;
+	ParserContext Context;
+
+	std::unordered_map<std::string, std::string> ClassNameCache;
+	std::unordered_map<std::string, std::string> ClassFullNameCache;
+	std::unordered_map<std::string, std::string> FunctionMangledNameCache;
+	std::unordered_map<std::string, std::string> FunctionShortNameCache;
+	std::unordered_map<std::string, std::string> CommentsCache;
+
+	std::unordered_map<std::string, CursorLocation> CursorLocationCache;
+
+	std::unordered_map<fs::path, bool> ShouldProcessCache;
+
+	std::unordered_map<std::string, ClassInfo> Classes;
+	std::unordered_map<std::string, MethodInfo> Methods;
+
+	std::unordered_set<std::string> VisitedDefinitions;
+
+	HeaderParser(const std::string& file, const std::vector<const char*>& arguments, unsigned int flags, const ParserContext& ctx, const std::vector<fs::path>& pathFilters = {});
 	~HeaderParser();
 
 	void VisitAll();
@@ -53,16 +58,20 @@ public:
 	std::string GetClassFullName(CXCursor cursor);
 	std::string GetFunctionMangledName(CXCursor cursor);
 	std::string GetFunctionShortName(CXCursor cursor);
-	std::optional<fs::path> GetFilePathForCursor(CXCursor cursor);
+	CursorLocation* GetCursorLocation(CXCursor cursor);
 	std::optional<std::string> GetCommentForCursor(CXCursor cursor);
-	bool IsOnFilter(const fs::path& file);
 	std::string GetCursorUSR(CXCursor cursor);
-	FunctionInfo* GetFunctionInfoByMangledName(const std::string& mangledName);
-	bool HasClass(const std::string& className);
-	bool HasFunction(const std::string& mangledName);
+	MethodInfo* GetMethodInfo(const std::string& usr);
+	ClassInfo* GetClassInfo(const std::string& usr);
+
+	bool HasClass(const std::string& usr);
+	bool HasFunction(const std::string& usr);
+	bool IsOnFilter(const fs::path& file);
+	bool WasDefinitionVisited(const std::string& usr);
+	bool HasFunctionBody(CXCursor cursor);
 
 	void SortAllClassesTopologically();
-	void SortAllFunctionsTopologically();
+	void SortAllMethodsTopologically();
 	void ResolveAllClassBases();
 	void ResolveAllClassFunctions();
 	void ResolveAllFunctionOverrides();
@@ -72,7 +81,11 @@ public:
 	void PrintTranslationUnitErrors();
 	void DoStuff();
 
+	bool HasAnyErrors();
+
 private:
-	CXChildVisitResult VisitClass(CXCursor cursor, const std::string& className, const fs::path& file, ClassVisitingData& visitingData);
-	CXChildVisitResult VisitFunction(CXCursor cursor, const std::string& mangledName, FunctionVisitingData& visitingData);
+	std::vector<CXCursor> GetMethodsInClass(CXCursor classCursor);
+	std::vector<CXCursor> GetBaseClassesOfClass(CXCursor classCursor);
+	CXChildVisitResult VisitClass(CXCursor cursor, ClassVisitingData& visitingData);
+	CXChildVisitResult VisitMethod(CXCursor cursor, FunctionVisitingData& visitingData);
 };

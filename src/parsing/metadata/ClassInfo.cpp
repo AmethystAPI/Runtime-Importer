@@ -1,7 +1,10 @@
-#include "parsing/ClassInfo.hpp"
-#include "parsing/FunctionInfo.hpp"
+#include "parsing/metadata/ClassInfo.hpp"
+
 #include <unordered_set>
 #include <functional>
+
+#include "parsing/metadata/MethodInfo.hpp"
+
 
 int ClassInfo::GetNextVirtualIndex() {
 	return NextVirtualIndex++;
@@ -11,19 +14,19 @@ bool ClassInfo::HasNoBases() const {
 	return BaseClasses.size() == 0;
 }
 
-bool ClassInfo::OwnsAtLeastOneVirtualFunction() {
-	for (auto* func : Functions) {
-		if (func->IsVirtual)
+bool ClassInfo::OwnsAtLeastOneVirtualMethod() {
+	for (auto* method : Methods) {
+		if (method->IsVirtual)
 			return true;
 	}
 	return false;
 }
 
-bool ClassInfo::HasAtLeastOneVirtualFunction() {
-	if (OwnsAtLeastOneVirtualFunction())
+bool ClassInfo::HasAtLeastOneVirtualMethod() {
+	if (OwnsAtLeastOneVirtualMethod())
 		return true;
 	for (auto* base : BaseClasses) {
-		if (base->HasAtLeastOneVirtualFunction())
+		if (base->HasAtLeastOneVirtualMethod())
 			return true;
 	}
 	return false;
@@ -31,7 +34,7 @@ bool ClassInfo::HasAtLeastOneVirtualFunction() {
 
 bool ClassInfo::DoesMultiInheritance()
 {
-	if (!HasAtLeastOneVirtualFunction())
+	if (!HasAtLeastOneVirtualMethod())
 		return false;
 	if (BaseClasses.size() > 1)
 		return true;
