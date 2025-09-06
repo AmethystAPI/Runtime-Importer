@@ -14,7 +14,7 @@ namespace Amethyst.SymbolGenerator
             Version version = Assembly.GetExecutingAssembly().GetName()?.Version ?? new Version(1, 0, 0);
             string shortVersion = $"{version.Major}.{version.Minor}.{version.Build}";
             Logger.Info($"Starting Symbol Generator v{shortVersion}...");
-            Logger.Info("Created by someone...");
+            Logger.Info("Created by ryd3v...");
 
             try
             {

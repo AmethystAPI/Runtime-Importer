@@ -21,8 +21,8 @@ using Amethyst.SymbolGenerator.Models;
 
 namespace Amethyst.SymbolGenerator.Commands
 {
-    [Command("generate", Description = "Generates symbol files based on the provided configuration.")]
-    public partial class GenerateCommand : ICommand
+    [Command("gen-syms", Description = "Generates symbol files based on the provided configuration.")]
+    public partial class GenerateSymbolsCommand : ICommand
     {
         [CommandOption("input", 'i', Description = "Path to the input directory containing header files.", IsRequired = true)]
         public string InputPath { get; set; } = null!;
@@ -52,7 +52,7 @@ namespace Amethyst.SymbolGenerator.Commands
             {
                 headerTracker = new(
                     inputDirectory: Input,
-                    checksumFile: new FileInfo(Path.Combine(Output.FullName, "file_checksums.json")),
+                    checksumFile: new FileInfo(Path.Combine(Output.FullName, "header_checksums.json")),
                     searchPatterns: ["*.h", "*.hpp", "*.hh", "*.hxx"],
                     filters: [.. Filters]
                 );
@@ -100,7 +100,7 @@ namespace Amethyst.SymbolGenerator.Commands
 
             if (hadErrors)
             {
-                return ValueTask.FromException(new Exception("Generation aborted due to errors."));
+                return ValueTask.FromException(new Exception("Symbol generation aborted due to errors."));
             }
 
             Utils.Benchmark("Comment Parsing", () =>
@@ -178,6 +178,7 @@ namespace Amethyst.SymbolGenerator.Commands
 
             // Save updated checksums only if all operations succeeded
             headerTracker.SaveChecksums(checksums);
+            Logger.Info("Symbols generated succesfully.");
             return default;
         }
     }

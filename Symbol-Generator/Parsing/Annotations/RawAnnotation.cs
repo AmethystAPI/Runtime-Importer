@@ -12,7 +12,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations
 
         public override string ToString()
         {
-            return $"[{Tag}({string.Join(", ", Arguments)})]";
+            return $"[{Tag}(...)]";
         }
     }
 }
