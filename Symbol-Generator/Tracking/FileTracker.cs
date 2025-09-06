@@ -49,6 +49,7 @@ namespace Amethyst.SymbolGenerator.Tracking
                 if (Filters.Any() && !Filters.Any(f => Path.GetRelativePath(InputDirectory.FullName, file.FullName).StartsWith(f)))
                     continue;
                 string filePath = file.FullName.NormalizeSlashes();
+#if !DEBUG
                 string content = File.ReadAllText(file.FullName);
                 ulong hash = XXH64.DigestOf(Encoding.UTF8.GetBytes(content));
 
@@ -61,6 +62,10 @@ namespace Amethyst.SymbolGenerator.Tracking
                 {
                     yield return new FileChange(ChangeType.Modified, filePath);
                 }
+#else
+                // In debug mode, treat all files as modified to simplify testing
+                yield return new FileChange(ChangeType.Modified, filePath);
+#endif
             }
 
             // Check for deleted files
