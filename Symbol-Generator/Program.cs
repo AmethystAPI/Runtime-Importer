@@ -1,13 +1,21 @@
 ﻿using Amethyst.SymbolGenerator.Diagnostics;
 using CliFx;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace Amethyst.SymbolGenerator
 {
-    internal class Program
+    public static class Program
     {
+        public static string[] CompilerArguments = [];
+
         static async Task<int> Main(string[] args)
         {
+            Version version = Assembly.GetExecutingAssembly().GetName()?.Version ?? new Version(1, 0, 0);
+            string shortVersion = $"{version.Major}.{version.Minor}.{version.Build}";
+            Logger.Info($"Starting Symbol Generator v{shortVersion}...");
+            Logger.Info("Created by someone...");
+
             try
             {
                 NativeLibrary.Load("libclang");
@@ -18,10 +26,27 @@ namespace Amethyst.SymbolGenerator
                 return 1;
             }
 
+            int sepIndex = Array.IndexOf(args, "--");
+
+            string[] before;
+            string[] after;
+
+            if (sepIndex >= 0)
+            {
+                before = args.Take(sepIndex).ToArray();
+                after = args.Skip(sepIndex + 1).ToArray();
+                CompilerArguments = after;
+            }
+            else
+            {
+                before = args;
+                after = Array.Empty<string>();
+            }
+
             return await new CliApplicationBuilder()
                 .AddCommandsFromThisAssembly()
                 .Build()
-                .RunAsync(args);
+                .RunAsync(before);
         }
     }
 }

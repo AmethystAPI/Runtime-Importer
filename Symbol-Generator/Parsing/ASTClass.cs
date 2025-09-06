@@ -29,6 +29,10 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public HashSet<string> HandledAnnotations { get; set; } = [];
 
+        public ASTVariable? Variable => null;
+
+        public bool IsVariable => false;
+
         public bool OwnsAtLeastOneVirtualMethod()
         {
             return Methods.Any(m => m.IsVirtual);

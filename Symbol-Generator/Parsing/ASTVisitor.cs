@@ -6,6 +6,7 @@ using CliFx.Infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -23,6 +24,7 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         private Dictionary<string, ASTClass> ClassCache = [];
         private Dictionary<string, ASTMethod> MethodCache = [];
+        private Dictionary<string, ASTVariable> VariableCache = [];
 
         public CXIndex Index { get; private set; }
         public CXTranslationUnit TranslationUnit { get; private set; }
@@ -30,6 +32,7 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public IReadOnlyCollection<ASTClass> Classes => ClassCache.Values;
         public IReadOnlyCollection<ASTMethod> Methods => MethodCache.Values;
+        public IReadOnlyCollection<ASTVariable> Variables => VariableCache.Values;
 
         public ASTVisitor(string inputFile, string inputDirectory, IEnumerable<string> arguments)
         {
@@ -106,18 +109,33 @@ namespace Amethyst.SymbolGenerator.Parsing
             return location;
         }
 
+
         public string GetMangledName(CXCursor cursor)
         {
-            if (cursor.Kind != CXCursorKind.CXCursor_CXXMethod &&
-                cursor.Kind != CXCursorKind.CXCursor_Constructor &&
-                cursor.Kind != CXCursorKind.CXCursor_Destructor &&
-                cursor.Kind != CXCursorKind.CXCursor_FunctionDecl)
+            if (cursor.IsNull || cursor.IsInvalid || cursor.IsInvalidDeclaration)
                 return "Unknown";
+
+            switch (cursor.Kind)
+            {
+                case CXCursorKind.CXCursor_FunctionDecl:
+                case CXCursorKind.CXCursor_CXXMethod:
+                case CXCursorKind.CXCursor_Constructor:
+                case CXCursorKind.CXCursor_Destructor:
+                case CXCursorKind.CXCursor_VarDecl:
+                    break;
+                default:
+                    return "Unknown";
+            }
+
+            if (!cursor.IsDefinition)
+                cursor = cursor.CanonicalCursor;
 
             string usr = cursor.Usr.ToString();
             if (MangleCache.TryGetValue(usr, out var cached))
                 return cached;
-            var mangled = cursor.Mangling.ToString();
+
+            string mangled = cursor.Mangling.ToString();
+            
             MangleCache[usr] = mangled;
             return mangled;
         }
@@ -162,6 +180,13 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public bool HasBody(CXCursor cursor)
         {
+            if (cursor.Kind == CXCursorKind.CXCursor_VarDecl)
+            {
+                if (!cursor.IsDefinition)
+                    cursor = cursor.CanonicalCursor;
+                return cursor.IsDefinition;
+            }
+
             if (cursor.Kind != CXCursorKind.CXCursor_FunctionDecl &&
                 cursor.Kind != CXCursorKind.CXCursor_CXXMethod &&
                 cursor.Kind != CXCursorKind.CXCursor_Constructor &&
@@ -246,6 +271,26 @@ namespace Amethyst.SymbolGenerator.Parsing
             return [.. methods];
         }
 
+        public CXCursor[] IterateClassVariables(CXCursor cursor)
+        {
+            if (cursor.Kind != CXCursorKind.CXCursor_ClassDecl && cursor.Kind != CXCursorKind.CXCursor_StructDecl)
+                return [];
+            var variables = new List<CXCursor>();
+            unsafe
+            {
+                // Visit children to find field declarations
+                cursor.VisitChildren((c, parent, data) =>
+                {
+                    if (c.Kind == CXCursorKind.CXCursor_FieldDecl || c.Kind == CXCursorKind.CXCursor_VarDecl)
+                    {
+                        variables.Add(c);
+                    }
+                    return CXChildVisitResult.CXChildVisit_Continue;
+                }, new CXClientData(nint.Zero));
+            }
+            return [.. variables];
+        }
+
         public ASTClass[] GetClasses()
         {
             var classes = new List<ASTClass>();
@@ -302,6 +347,33 @@ namespace Amethyst.SymbolGenerator.Parsing
             return [.. methods];
         }
 
+        public ASTVariable[] GetVariables()
+        {
+            var variables = new List<ASTVariable>();
+            unsafe
+            {
+                // Traverse the AST
+                TranslationUnit.Cursor.VisitChildren((cursor, parent, data) =>
+                {
+                    // Get variable declarations
+                    if (cursor.Kind == CXCursorKind.CXCursor_VarDecl)
+                    {
+                        if (!cursor.IsDefinition)
+                            cursor = cursor.CanonicalCursor;
+                        var usr = cursor.Usr.ToString();
+                        var (result, variable) = VisitVariable(cursor, parent, usr);
+                        if (variable is not null)
+                        {
+                            variables.Add(variable);
+                            return result;
+                        }
+                    }
+                    return CXChildVisitResult.CXChildVisit_Recurse;
+                }, new CXClientData(nint.Zero));
+            }
+            return [.. variables];
+        }
+
         private (CXChildVisitResult result, ASTClass? rawClass) VisitClass(CXCursor cursor, CXCursor parent, string usr)
         {
             // Get from cache if available
@@ -344,6 +416,14 @@ namespace Amethyst.SymbolGenerator.Parsing
                 }
             ).Where(t => t is not null)!];
 
+            ASTVariable[] variables = [.. IterateClassVariables(cursor)
+                .Select(c =>
+                {
+                    var (result, variable) = VisitVariable(c, cursor, c.Usr.ToString());
+                    return variable;
+                }
+            ).Where(t => t is not null)!];
+
             ASTClass rawClass = new()
             {
                 Name = name,
@@ -356,6 +436,11 @@ namespace Amethyst.SymbolGenerator.Parsing
             foreach (var method in rawClass.Methods)
             {
                 method.DeclaringClass = rawClass;
+            }
+
+            foreach (var variable in variables)
+            {
+                variable.DeclaringClass = rawClass;
             }
 
             ClassCache[usr] = rawClass;
@@ -403,14 +488,59 @@ namespace Amethyst.SymbolGenerator.Parsing
             return (CXChildVisitResult.CXChildVisit_Continue, method);
         }
 
+        public (CXChildVisitResult result, ASTVariable? variable) VisitVariable(CXCursor cursor, CXCursor parent, string usr)
+        {
+            // Get from cache if available
+            if (VariableCache.TryGetValue(usr, out var cached))
+            {
+                if (!cached.HasDefinition && cursor.IsDefinition)
+                {
+                    cached.HasDefinition = true;
+                }
+                return (CXChildVisitResult.CXChildVisit_Continue, cached);
+            }
+
+            ASTCursorLocation? location = GetLocation(cursor);
+            string name = GetSpelling(cursor);
+            string mangledName = "Unknown";
+            string? rawComment = GetRawComment(cursor);
+            bool isImported = IsImported(cursor);
+            string? namespaceName = null;
+
+            if (parent.Kind == CXCursorKind.CXCursor_Namespace)
+            {
+                namespaceName = GetFullNamespace(parent);
+            }
+
+            if (!cursor.IsCanonical)
+                cursor = cursor.CanonicalCursor;
+            
+            ASTVariable variable = new()
+            {
+                Name = name,
+                MangledName = mangledName,
+                Location = location,
+                DeclaringClass = null,
+                RawComment = rawComment,
+                IsImported = isImported,
+                HasDefinition = false,
+                Namespace = namespaceName,
+                IsStatic = cursor.StorageClass == CX_StorageClass.CX_SC_Static
+            };
+            VariableCache[usr] = variable;
+            return (CXChildVisitResult.CXChildVisit_Continue, variable);
+        }
+
         public void Reset()
         {
             SpellingCache.Clear();
             LocationCache.Clear();
             ClassCache.Clear();
+            VariableCache.Clear();
             MethodCache.Clear();
             MangleCache.Clear();
             RawCommentCache.Clear();
+            IsImportedCache.Clear();
         }
     }
 }

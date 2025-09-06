@@ -7,19 +7,19 @@ using System.Threading.Tasks;
 
 namespace Amethyst.SymbolGenerator.Parsing
 {
-    public class ASTMethod : IAnnotationTarget
+    public class ASTVariable : IAnnotationTarget
     {
-        public string Name { get; set; } = null!;
-        public string MangledName { get; set; } = null!;
+        public string Name { get; set; } = string.Empty;
+        public string MangledName { get; set; } = string.Empty;
         public string? Namespace { get; set; } = null;
         public ASTClass? DeclaringClass { get; set; } = null;
         public ASTCursorLocation? Location { get; set; } = null;
-        public bool IsVirtual { get; set; } = false;
         public bool IsImported { get; set; } = false;
-        public bool HasBody { get; set; } = false;
+        public bool HasDefinition { get; set; } = false;
         public string? RawComment { get; set; } = null;
+        public bool IsStatic { get; set; } = false;
 
-        public bool IsFreeFunction => DeclaringClass is null;
+        public bool IsFreeVariable => DeclaringClass is null;
 
         public string FullName
         {
@@ -38,16 +38,16 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public ASTClass? Class => DeclaringClass;
 
-        public ASTMethod? Method => this;
+        public ASTMethod? Method => null;
+
+        public ASTVariable? Variable => this;
 
         public bool IsClass => false;
 
-        public bool IsMethod => true;
+        public bool IsMethod => false;
+
+        public bool IsVariable => true;
 
         public HashSet<string> HandledAnnotations { get; set; } = [];
-
-        public ASTVariable? Variable => null;
-
-        public bool IsVariable => false;
     }
 }

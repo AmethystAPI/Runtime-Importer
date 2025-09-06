@@ -32,8 +32,9 @@ namespace Amethyst.SymbolGenerator.Tracking
             Filters = filters;
         }
 
-        public IEnumerable<FileChange> TrackChanges()
+        public (FileChange[] Changes, Dictionary<string, ulong> NewChecksums) TrackChanges()
         {
+            List<FileChange> changes = [];
             // Load existing checksums
             Dictionary<string, ulong> lastChecksums = LoadChecksums();
             Dictionary<string, ulong> newChecksums = [];
@@ -56,15 +57,15 @@ namespace Amethyst.SymbolGenerator.Tracking
                 newChecksums[filePath] = hash;
                 if (!lastChecksums.TryGetValue(filePath, out var lastHash))
                 {
-                    yield return new FileChange(ChangeType.Added, filePath);
+                    changes.Add(new FileChange(ChangeType.Added, filePath));
                 }
                 else if (lastHash != hash)
                 {
-                    yield return new FileChange(ChangeType.Modified, filePath);
+                    changes.Add(new FileChange(ChangeType.Modified, filePath));
                 }
 #else
                 // In debug mode, treat all files as modified to simplify testing
-                yield return new FileChange(ChangeType.Modified, filePath);
+                changes.Add(new FileChange(ChangeType.Modified, filePath));
 #endif
             }
 
@@ -73,12 +74,11 @@ namespace Amethyst.SymbolGenerator.Tracking
             {
                 if (!newChecksums.ContainsKey(lastFile))
                 {
-                    yield return new FileChange(ChangeType.Deleted, lastFile);
+                    changes.Add(new FileChange(ChangeType.Deleted, lastFile));
                 }
             }
 
-            // Save the new checksums
-            SaveChecksums(newChecksums);
+            return (changes.ToArray(), newChecksums);
         }
 
         public Dictionary<string, ulong> LoadChecksums()

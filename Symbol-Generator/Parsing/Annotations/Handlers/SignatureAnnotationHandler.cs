@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Amethyst.SymbolGenerator.Models;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -32,11 +33,10 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
                 throw new InvalidOperationException($"Signature annotation can't be applied to a method that already has a Address annotation.");
             if (!annotation.Target.HandledAnnotations.Add(annotation.Tag))
                 throw new InvalidOperationException($"Annotation target already has a Signature annotation.");
-            return new Dictionary<string, string>()
+            return new MethodSymbolJSONModel()
             {
-                { "type", "function_signature" },
-                { "function", annotation.Target.Method.MangledName },
-                { "signature", args[0] }
+                Name = annotation.Target.Method.MangledName,
+                Signature = args[0]
             };
         }
 

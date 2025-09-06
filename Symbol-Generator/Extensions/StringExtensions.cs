@@ -24,5 +24,12 @@ namespace Amethyst.SymbolGenerator.Extensions
         {
             return str.Replace('\\', '/');
         }
+
+        public static string TrimSingle(this string s, char c)
+        {
+            if (s.Length >= 2 && s[0] == c && s[^1] == c)
+                return s.Substring(1, s.Length - 2);
+            return s;
+        }
     }
 }

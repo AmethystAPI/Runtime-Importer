@@ -9,6 +9,14 @@ namespace Amethyst.SymbolGenerator.Parsing
 {
     public static class ASTPrinter
     {
+        public static void PrintVariable(ASTVariable variable, string inputDir)
+        {
+            var kind = variable.IsFreeVariable ? "Free Variable" : "Variable";
+            Logger.Info($"{kind}: {variable.FullName}, Imported: {variable.IsImported}, HasDefinition: {variable.HasDefinition}, Static: {variable.IsStatic}");
+            if (variable.Location is not null && !string.IsNullOrEmpty(variable.Location.File))
+                Logger.Info($"   at {Path.GetRelativePath(inputDir, variable.Location.File)}:{variable.Location.Line}:{variable.Location.Column}:{variable.Location.Offset}");
+        }
+
         public static void PrintMethod(ASTMethod method, string inputDir)
         {
             var kind = method.IsFreeFunction ? "Free Function" : "Method";

@@ -17,6 +17,7 @@ using System.Text.RegularExpressions;
 using Amethyst.SymbolGenerator.Utility;
 using Amethyst.SymbolGenerator.Parsing.Annotations;
 using Newtonsoft.Json;
+using Amethyst.SymbolGenerator.Models;
 
 namespace Amethyst.SymbolGenerator.Commands
 {
@@ -24,19 +25,19 @@ namespace Amethyst.SymbolGenerator.Commands
     public partial class GenerateCommand : ICommand
     {
         [CommandOption("input", 'i', Description = "Path to the input directory containing header files.", IsRequired = true)]
-        public DirectoryInfo Input { get; set; } = null!;
+        public string InputPath { get; set; } = null!;
 
         [CommandOption("output", 'o', Description = "Path to the output directory where symbol files will be generated.", IsRequired = true)]
-        public DirectoryInfo Output { get; set; } = null!;
+        public string OutputPath { get; set; } = null!;
 
         [CommandOption("filters", 'f', Description = "List of filters to apply when generating symbols.")]
         public IReadOnlyList<string> Filters { get; set; } = null!;
 
-        [CommandOption("c-args")]
-        public IReadOnlyList<string> CompilerArguments { get; set; } = [];
-
         public ValueTask ExecuteAsync(IConsole console)
         {
+            DirectoryInfo Input = new(InputPath);
+            DirectoryInfo Output = new(OutputPath);
+
             ArgumentNullException.ThrowIfNull(Input);
             ArgumentNullException.ThrowIfNull(Output);
             if (Input.Exists is false)
@@ -46,15 +47,16 @@ namespace Amethyst.SymbolGenerator.Commands
             Directory.CreateDirectory(Output.FullName);
 
             // Track changes in header files
-            FileChange[] changes = Utils.Benchmark<FileChange[]>("File Tracking", () =>
+            FileTracker headerTracker = null!;
+            var (changes, checksums) = Utils.Benchmark<(FileChange[] changes, Dictionary<string, ulong> checksums)>("File Tracking", () =>
             {
-                FileTracker headerTracker = new(
+                headerTracker = new(
                     inputDirectory: Input,
                     checksumFile: new FileInfo(Path.Combine(Output.FullName, "file_checksums.json")),
                     searchPatterns: ["*.h", "*.hpp", "*.hh", "*.hxx"],
                     filters: [.. Filters]
                 );
-                return [.. headerTracker.TrackChanges()];
+                return headerTracker.TrackChanges();
             });
 
             // Separate changes into added/modified and deleted
@@ -69,13 +71,14 @@ namespace Amethyst.SymbolGenerator.Commands
 
             List<RawAnnotation> annotations = [];
             ASTMethod[] methods = [];
+            ASTVariable[] variables = [];
             bool hadErrors = Utils.Benchmark<bool>("AST Parsing", () =>
             {
                 // Parse the generated .cpp file
                 ASTVisitor visitor = new(
                     inputFile: generatedFile,
                     inputDirectory: Input.FullName,
-                    arguments: CompilerArguments.Select(a => a.TrimStart('\'').TrimEnd('\''))
+                    arguments: Program.CompilerArguments
                 );
 
                 // Handle diagnostics
@@ -85,11 +88,13 @@ namespace Amethyst.SymbolGenerator.Commands
                     return true;
                 }
 
-                // Traverse the AST and collect classes and methods
+                // Traverse the AST and collect classes, variables and methods
                 _ = visitor.GetClasses();
+                _ = visitor.GetVariables();
                 _ = visitor.GetMethods();
 
                 methods = [.. visitor.Methods];
+                variables = [.. visitor.Variables];
                 return false;
             });
 
@@ -138,13 +143,22 @@ namespace Amethyst.SymbolGenerator.Commands
 
             Utils.Benchmark("Generate Output", () =>
             {
+                JsonSerializerSettings jsonSettings = new()
+                {
+                    NullValueHandling = NullValueHandling.Ignore,
+                };
+
                 // Generate output JSON files
                 foreach (var (file, data) in annotationsData)
                 {
                     string relativePath = Path.GetRelativePath(Input.FullName, file);
                     string outputFilePath = Path.Combine(Output.FullName, "symbols", Path.ChangeExtension(relativePath, "symbols.json"));
                     Directory.CreateDirectory(Path.GetDirectoryName(outputFilePath)!);
-                    string json = JsonConvert.SerializeObject(data, Formatting.Indented);
+                    string json = JsonConvert.SerializeObject(new SymbolJSONModel
+                    {
+                        FormatVersion = 1,
+                        Functions = [.. data.OfType<MethodSymbolJSONModel>()],
+                    }, Formatting.Indented, jsonSettings);
                     File.WriteAllText(outputFilePath, json);
                     Logger.Info($"Generated: {outputFilePath}");
                 }
@@ -162,6 +176,8 @@ namespace Amethyst.SymbolGenerator.Commands
                 }
             });
 
+            // Save updated checksums only if all operations succeeded
+            headerTracker.SaveChecksums(checksums);
             return default;
         }
     }
