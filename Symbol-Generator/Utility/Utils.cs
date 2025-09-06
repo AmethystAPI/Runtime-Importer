@@ -30,7 +30,7 @@ namespace Amethyst.SymbolGenerator.Utility
             Logger.Info($"[Benchmark] {name} took {sw.Elapsed.TotalMilliseconds:F0} ms");
         }
 
-        [GeneratedRegex(@"^\s*///\s*@\s*SymbolGeneration\s*$", RegexOptions.Multiline)]
+        [GeneratedRegex(@"^\s*///\s*@\s*symbolgeneration\s*$", RegexOptions.Multiline)]
         private static partial Regex SymbolGenerationMarker();
 
         public static string[] CreateIncludeFile(string includeFile, string inputDir, IEnumerable<FileChange> files)

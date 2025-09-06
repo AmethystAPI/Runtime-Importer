@@ -38,8 +38,6 @@ namespace Amethyst.SymbolGenerator.Commands
             DirectoryInfo Input = new(InputPath);
             DirectoryInfo Output = new(OutputPath);
 
-            ArgumentNullException.ThrowIfNull(Input);
-            ArgumentNullException.ThrowIfNull(Output);
             if (Input.Exists is false)
                 throw new DirectoryNotFoundException($"Input directory '{Input.FullName}' does not exist.");
             

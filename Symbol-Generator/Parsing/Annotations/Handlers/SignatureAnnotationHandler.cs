@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
 {
-    [AnnotationHandler("Signature")]
+    [AnnotationHandler("signature")]
     public partial class SignatureAnnotationHandler : IAnnotationHandler
     {
         public object? Handle(RawAnnotation annotation)
@@ -29,7 +29,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
                 throw new ArgumentException("Signature annotation argument cannot be empty.");
             if (!IDASignatureRegex().Match(args[0]).Success)
                 throw new ArgumentException($"Signature annotation argument must be a valid byte signature (e.g., '48 8B ? ? ? 00 00'). Received '{args[0]}'");
-            if (annotation.Target.HandledAnnotations.Contains("Address"))
+            if (annotation.Target.HandledAnnotations.Contains("address"))
                 throw new InvalidOperationException($"Signature annotation can't be applied to a method that already has a Address annotation.");
             if (!annotation.Target.HandledAnnotations.Add(annotation.Tag))
                 throw new InvalidOperationException($"Annotation target already has a Signature annotation.");
