@@ -1,6 +1,7 @@
 ﻿using Amethyst.Common.Extensions;
 using K4os.Hash.xxHash;
 using Newtonsoft.Json;
+using System.Text;
 
 namespace Amethyst.Common.Tracking
 {

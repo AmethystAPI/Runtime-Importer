@@ -9,4 +9,14 @@
     <RootNamespace>Amethyst.ModuleTweaker</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Amethyst.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AsmResolver" Version="5.5.1" />
+    <PackageReference Include="AsmResolver.PE" Version="5.5.1" />
+    <PackageReference Include="AsmResolver.PE.File" Version="5.5.1" />
+  </ItemGroup>
+
 </Project>

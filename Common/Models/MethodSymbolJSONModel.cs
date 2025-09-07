@@ -5,7 +5,7 @@ namespace Amethyst.Common.Models
     public class MethodSymbolJSONModel
     {
         [JsonProperty("name")]
-        public string? Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         [JsonProperty("address")]
         public string? Address { get; set; }

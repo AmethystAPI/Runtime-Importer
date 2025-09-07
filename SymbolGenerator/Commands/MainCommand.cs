@@ -11,7 +11,7 @@ using Amethyst.Common.Models;
 
 namespace Amethyst.SymbolGenerator.Commands
 {
-    [Command("Generates symbol files based on the provided configuration.")]
+    [Command(Description = "Generates symbol files based on the provided configuration.")]
     public partial class MainCommand : ICommand
     {
         [CommandOption("input", 'i', Description = "Path to the input directory containing header files.", IsRequired = true)]

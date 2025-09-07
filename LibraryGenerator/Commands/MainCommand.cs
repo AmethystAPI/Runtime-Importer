@@ -85,8 +85,7 @@ namespace Amethyst.LibraryGenerator.Commands
             Utils.CreateDefinitionFile(defFilePath, allMangledNames);
 
             // Generate .lib file
-            Lib lib = new();
-            var libProc = lib.GenerateLib(defFilePath, libFilePath);
+            var libProc = Lib.GenerateLib(defFilePath, libFilePath);
             libProc.WaitForExit();
             if (libProc.ExitCode != 0)
             {
