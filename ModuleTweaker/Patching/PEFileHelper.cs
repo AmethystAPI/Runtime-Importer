@@ -159,12 +159,19 @@ namespace Amethyst.ModuleTweaker.Patching
 
                 using var ms = new MemoryStream();
                 var writer = new BinaryStreamWriter(ms);
+                uint countPosition = (uint)ms.Position;
+                writer.WriteUInt32(0u); // Placeholder for count
                 for (uint i = 0; i < methods.Length; i++)
                 {
                     var method = methods[i];
                     writer.WriteBytes([.. Encoding.ASCII.GetBytes(method.Name), 0]);
                     nameToIndex[method.Name] = i;
                 }
+
+                // Go back and write the count
+                ms.Seek(countPosition, SeekOrigin.Begin);
+                writer.WriteUInt32((uint)nameToIndex.Count);
+
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
                 Logger.Info($"Created mangle table section ({RuntimeImportMangleTableName}).");
@@ -181,6 +188,8 @@ namespace Amethyst.ModuleTweaker.Patching
                 using var ms = new MemoryStream();
                 var writer = new BinaryStreamWriter(ms);
                 uint index = 0;
+                uint countPosition = (uint)ms.Position;
+                writer.WriteUInt32(0u); // Placeholder for count
                 for (uint i = 0; i < methods.Length; i++)
                 {
                     var method = methods[i];
@@ -189,6 +198,11 @@ namespace Amethyst.ModuleTweaker.Patching
                     writer.WriteBytes([.. Encoding.ASCII.GetBytes(method.Signature), 0]);
                     signatureToIndex[method.Signature] = index++;
                 }
+
+                // Go back and write the count
+                ms.Seek(countPosition, SeekOrigin.Begin);
+                writer.WriteUInt32(index);
+
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
                 Logger.Info($"Created signature table section ({RuntimeImportSignatureTableName}).");
