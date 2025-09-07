@@ -40,11 +40,44 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations
 
         public static ProcessedAnnotation? ProcessAnnotation(RawAnnotation annotation)
         {
-            if (Handlers.TryGetValue(annotation.Tag.ToLower(), out var handler))
+            string tagLower = annotation.Tag.ToLower();
+            if (Handlers.TryGetValue(tagLower, out var handler))
             {
                 try
                 {
+                    bool canApply;
+                    Type handlerType = handler.GetType();
+                    var handlerAtrib = handlerType.GetCustomAttribute<AnnotationHandlerAttribute>()!;
+
+                    if (handlerAtrib.CollidesWithSelf && annotation.Target.HandledAnnotations.Contains(tagLower))
+                    {
+                        Logger.Warn($"Annotation with tag '{tagLower}' has already been applied to '{annotation.Target.FullName}'. Skipping duplicate.");
+                        return null;
+                    }
+
+                    foreach (var collidingTag in handlerAtrib.CollidesWith)
+                    {
+                        if (annotation.Target.HandledAnnotations.Contains(collidingTag.ToLower()))
+                        {
+                            Logger.Warn($"Annotation with tag '{tagLower}' cannot be applied to '{annotation.Target.FullName}' because it collides with previously applied annotation '{collidingTag}'.");
+                            return null;
+                        }
+                    }
+
+                    try
+                    {
+                        canApply = handler.CanApply(annotation);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn(ex.Message);
+                        canApply = false;
+                    }
+                    if (!canApply)
+                        return null;
+
                     var result = handler.Handle(annotation);
+
                     if (result is null)
                         return null;
                     var processed = new ProcessedAnnotation(annotation, result);
@@ -53,7 +86,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn($"Error processing annotation with tag '{annotation.Tag}' for '{annotation.Target.FullName}': \n    {ex.Message}\n    at {annotation.Location}");
+                    Logger.Warn($"Error processing annotation with tag '{tagLower}' for '{annotation.Target.FullName}': \n    {ex.Message}\n    at {annotation.Location}");
                 }
             }
             else
