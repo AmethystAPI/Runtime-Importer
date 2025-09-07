@@ -70,6 +70,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     File.Sections.RemoveAt(i);
                 }
             }
+            File.AlignSections();
         }
 
         public bool Patch(IEnumerable<MethodSymbolJSONModel> methodSymbols)
@@ -280,6 +281,9 @@ namespace Amethyst.ModuleTweaker.Patching
                     SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
                 using var ms = new MemoryStream();
                 var writer = new BinaryStreamWriter(ms);
+                // Write original import directory RVA and size at the start
+                writer.WriteUInt32(importDirectory.VirtualAddress);
+                writer.WriteUInt32(importDirectory.Size);
                 foreach (var descriptor in importDescriptors)
                 {
                     if (descriptor.Equals(minecraftWindowsImportDescriptor.Value))
@@ -296,7 +300,7 @@ namespace Amethyst.ModuleTweaker.Patching
                 // Update import directory to point to the new table
                 File.OptionalHeader.SetDataDirectory(
                     DataDirectoryIndex.ImportDirectory,
-                    new(section.Rva, (uint)ms.Length));
+                    new(section.Rva + sizeof(uint) * 2, (uint)ms.Length));
                 Logger.Info("Killed import from 'Minecraft.Windows.exe', patched module for runtime importing.");
             }
             return true;
