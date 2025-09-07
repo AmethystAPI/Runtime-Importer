@@ -70,6 +70,7 @@ namespace Amethyst.LibraryGenerator.Commands
                             {
                                 if (string.IsNullOrEmpty(function.Name))
                                     continue;
+                                Logger.Info("Adding symbol: " + function.Name);
                                 allMangledNames.Add(function.Name);
                             }
                             break;

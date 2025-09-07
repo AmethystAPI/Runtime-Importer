@@ -50,6 +50,7 @@ namespace Amethyst.ModuleTweaker.Patching
         {
             if (!IsPatched())
                 return;
+            Logger.Info("Unpatching PE file...");
             for (int i = File.Sections.Count - 1; i >= 0; i--)
             {
                 var section = File.Sections[i];
@@ -64,7 +65,10 @@ namespace Amethyst.ModuleTweaker.Patching
                         new(originalIDTRva, originalIDTSize));
                 }
                 if (IsCustomSectionName(section.Name))
+                {
+                    Logger.Info($"Removing custom section '{section.Name}'...");
                     File.Sections.RemoveAt(i);
+                }
             }
         }
 
@@ -75,6 +79,8 @@ namespace Amethyst.ModuleTweaker.Patching
                 Logger.Info("PE file is already patched, unpatching it first.");
                 Unpatch();
             }
+
+            Logger.Info("Patching PE file for runtime importing...");
 
             // Get the import directory entries
             var importDirectory = File.OptionalHeader.GetDataDirectory(DataDirectoryIndex.ImportDirectory);
@@ -161,6 +167,8 @@ namespace Amethyst.ModuleTweaker.Patching
                 }
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
+                Logger.Info($"Created mangle table section ({RuntimeImportMangleTableName}).");
+                Logger.Info($"Added {methods.Length} mangled names to mangle table.");
             }
 
             // Create signature table section
@@ -183,6 +191,8 @@ namespace Amethyst.ModuleTweaker.Patching
                 }
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
+                Logger.Info($"Created signature table section ({RuntimeImportSignatureTableName}).");
+                Logger.Info($"Added {signatureToIndex.Count} signatures to signature table.");
             }
 
             // Create function descriptor table section
@@ -193,6 +203,9 @@ namespace Amethyst.ModuleTweaker.Patching
                     SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
                 using var ms = new MemoryStream();
                 var writer = new BinaryStreamWriter(ms);
+                uint countPosition = (uint)ms.Position;
+                writer.WriteUInt32(0u); // Placeholder for count
+                uint count = 0;
                 for (uint i = 0; i < methods.Length; i++)
                 {
                     var method = methods[i];
@@ -229,9 +242,18 @@ namespace Amethyst.ModuleTweaker.Patching
                     // uint: IATRva
                     // byte: UsesSignature
                     // ulong: SignatureIndex or Address
+                    count++;
+                    Logger.Info($"Added runtime import for function: " + method.Name);
                 }
+
+                // Go back and write the count
+                ms.Seek(countPosition, SeekOrigin.Begin);
+                writer.WriteUInt32(count);
+
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
+                Logger.Info($"Created function descriptor table section ({RuntimeImportFunctionDescriptorTableName}).");
+                Logger.Info($"Added {methods.Length} function descriptors to function descriptor table.");
             }
 
             // Create new import descriptor table section
@@ -259,6 +281,7 @@ namespace Amethyst.ModuleTweaker.Patching
                 File.OptionalHeader.SetDataDirectory(
                     DataDirectoryIndex.ImportDirectory,
                     new(section.Rva, (uint)ms.Length));
+                Logger.Info("Killed import from 'Minecraft.Windows.exe', patched module for runtime importing.");
             }
             File.AlignSections();
             return true;
