@@ -124,10 +124,10 @@ namespace Amethyst.ModuleTweaker.Patching
             }
 
             // Map all mangled names for "Minecraft.Windows.exe" functions to IAT offsets
-            uint iatRva = 0;
+            uint iatRva = minecraftWindowsImportDescriptor.Value.FirstThunk;
+            uint iatSize = 0;
             Dictionary<string, uint> nameToIatIndex = [];
             {
-                iatRva = minecraftWindowsImportDescriptor.Value.OriginalFirstThunk;
                 var reader = File.CreateReaderAtRva(minecraftWindowsImportDescriptor.Value.OriginalFirstThunk);
                 uint iatIndex = 0;
                 while (reader.CanRead(sizeof(ulong)))
@@ -135,6 +135,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     ulong iltEntry = reader.ReadUInt64();
                     if (iltEntry == 0)
                         break;
+                    iatIndex++;
                     bool isOrdinal = (iltEntry & 0x8000000000000000) != 0;
                     if (isOrdinal)
                         continue;
@@ -143,8 +144,9 @@ namespace Amethyst.ModuleTweaker.Patching
                     var hintNameReader = File.CreateReaderAtRva(hintNameRva);
                     ushort hint = hintNameReader.ReadUInt16();
                     string functionName = hintNameReader.ReadAsciiString();
-                    nameToIatIndex[functionName] = iatIndex++;
+                    nameToIatIndex[functionName] = iatIndex - 1;
                 }
+                iatSize = iatIndex;
             }
 
             MethodSymbolJSONModel[] methods = [.. methodSymbols];
@@ -219,6 +221,8 @@ namespace Amethyst.ModuleTweaker.Patching
                 var writer = new BinaryStreamWriter(ms);
                 uint countPosition = (uint)ms.Position;
                 writer.WriteUInt32(0u); // Placeholder for count
+                writer.WriteUInt32(iatRva);
+                writer.WriteUInt32(iatSize);
                 uint count = 0;
                 for (uint i = 0; i < methods.Length; i++)
                 {
@@ -235,7 +239,6 @@ namespace Amethyst.ModuleTweaker.Patching
 
                     writer.WriteUInt32(nameIndex);
                     writer.WriteUInt32(iatIndex);
-                    writer.WriteUInt32(iatRva);
                     writer.WriteByte((byte)(usesSignature ? 1 : 0));
 
                     if (usesSignature)
@@ -253,7 +256,6 @@ namespace Amethyst.ModuleTweaker.Patching
 
                     // uint: NameIndex
                     // uint: IATIndex
-                    // uint: IATRva
                     // byte: UsesSignature
                     // ulong: SignatureIndex or Address
                     count++;
@@ -297,7 +299,6 @@ namespace Amethyst.ModuleTweaker.Patching
                     new(section.Rva, (uint)ms.Length));
                 Logger.Info("Killed import from 'Minecraft.Windows.exe', patched module for runtime importing.");
             }
-            File.AlignSections();
             return true;
         }
 
