@@ -19,12 +19,13 @@ namespace Amethyst.SymbolGenerator.Parsing
         public CXIndex Index { get; private set; }
         public CXTranslationUnit TranslationUnit { get; private set; }
         public string InputDirectory { get; private set; }
+        public HashSet<string> StrictHeaders { get; private set; } = [];
 
         public IReadOnlyCollection<ASTClass> Classes => ClassCache.Values;
         public IReadOnlyCollection<ASTMethod> Methods => MethodCache.Values;
         public IReadOnlyCollection<ASTVariable> Variables => VariableCache.Values;
 
-        public ASTVisitor(string inputFile, string inputDirectory, IEnumerable<string> arguments)
+        public ASTVisitor(string inputFile, string inputDirectory, IEnumerable<string> arguments, IEnumerable<string> strictHeaders)
         {
             Index = CXIndex.Create();
             var error = CXTranslationUnit.TryParse(
@@ -38,6 +39,7 @@ namespace Amethyst.SymbolGenerator.Parsing
                 throw new Exception($"Failed to parse translation unit. Error code: {error}");
             TranslationUnit = translationUnit;
             InputDirectory = inputDirectory.NormalizeSlashes();
+            StrictHeaders = [.. strictHeaders.Select(h => Path.GetFullPath(h).NormalizeSlashes())];
         }
 
         #region Diagnostics
@@ -88,13 +90,14 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public ASTCursorLocation? GetLocation(CXCursor cursor)
         {
-            if (!cursor.IsDefinition)
-                cursor = cursor.CanonicalCursor;
             string usr = cursor.Usr.ToString();
             if (LocationCache.TryGetValue(usr, out var cached))
                 return cached;
             cursor.Location.GetFileLocation(out var file, out var line, out var column, out var offset);
-            var location = new ASTCursorLocation(file.ToString().NormalizeSlashes(), line, column, offset);
+            string path = file.ToString();
+            if (!string.IsNullOrEmpty(path))
+                path = Path.GetFullPath(path.ToString()).NormalizeSlashes();
+            var location = new ASTCursorLocation(path, line, column, offset);
             LocationCache[usr] = location;
             return location;
         }
@@ -102,8 +105,10 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public string GetMangledName(CXCursor cursor)
         {
-            if (cursor.IsNull || cursor.IsInvalid || cursor.IsInvalidDeclaration)
+            if (cursor.IsNull || cursor.IsInvalid)
                 return "Unknown";
+
+            cursor = GetDefinition(cursor);
 
             switch (cursor.Kind)
             {
@@ -112,13 +117,12 @@ namespace Amethyst.SymbolGenerator.Parsing
                 case CXCursorKind.CXCursor_Constructor:
                 case CXCursorKind.CXCursor_Destructor:
                 case CXCursorKind.CXCursor_VarDecl:
+                case CXCursorKind.CXCursor_ConversionFunction:
+                case CXCursorKind.CXCursor_FirstDecl:
                     break;
                 default:
                     return "Unknown";
             }
-
-            if (!cursor.IsDefinition)
-                cursor = cursor.CanonicalCursor;
 
             string usr = cursor.Usr.ToString();
             if (MangleCache.TryGetValue(usr, out var cached))
@@ -132,8 +136,6 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public string? GetRawComment(CXCursor cursor)
         {
-            if (!cursor.IsDefinition)
-                cursor = cursor.CanonicalCursor;
             string usr = cursor.Usr.ToString();
             if (RawCommentCache.TryGetValue(usr, out var cached))
                 return cached;
@@ -146,8 +148,6 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public bool IsImported(CXCursor cursor)
         {
-            if (!cursor.IsDefinition)
-                cursor = cursor.CanonicalCursor;
             string usr = cursor.Usr.ToString();
             if (IsImportedCache.TryGetValue(usr, out var cached))
                 return cached;
@@ -172,8 +172,6 @@ namespace Amethyst.SymbolGenerator.Parsing
         {
             if (cursor.Kind == CXCursorKind.CXCursor_VarDecl)
             {
-                if (!cursor.IsDefinition)
-                    cursor = cursor.CanonicalCursor;
                 return cursor.IsDefinition;
             }
 
@@ -182,8 +180,6 @@ namespace Amethyst.SymbolGenerator.Parsing
                 cursor.Kind != CXCursorKind.CXCursor_Constructor &&
                 cursor.Kind != CXCursorKind.CXCursor_Destructor)
                 return false;
-            if (!cursor.IsDefinition)
-                cursor = cursor.CanonicalCursor;
             bool hasBody = cursor.HasBody;
             if (hasBody)
                 return true;
@@ -218,71 +214,53 @@ namespace Amethyst.SymbolGenerator.Parsing
             return string.Join("::", names);
         }
 
-        public CXCursor[] IterateBaseClasses(CXCursor cursor)
+        public CXCursor GetDefinition(CXCursor cursor)
         {
-            if (cursor.Kind != CXCursorKind.CXCursor_ClassDecl && cursor.Kind != CXCursorKind.CXCursor_StructDecl)
-                return [];
-
-            var bases = new List<CXCursor>();
-            unsafe
+            if (cursor.IsNull || cursor.IsInvalid || cursor.IsDefinition)
+                return cursor;
+            CXCursor old = cursor;
+            if (!cursor.IsDefinition && cursor.IsDeclaration)
             {
-                // Visit children to find base specifiers
-                cursor.VisitChildren((c, parent, data) =>
-                {
-                    if (c.Kind == CXCursorKind.CXCursor_CXXBaseSpecifier)
-                    {
-                        bases.Add(c);
-                    }
-                    return CXChildVisitResult.CXChildVisit_Continue;
-                }, new CXClientData(nint.Zero));
+                old = cursor;
+                cursor = cursor.CanonicalCursor;
             }
-            return [.. bases];
-        }
+            if (cursor.IsNull || cursor.IsInvalid)
+                cursor = old;
+            return cursor;
+        } 
 
-        public CXCursor[] IterateClassMethods(CXCursor cursor)
+        private (List<CXCursor> methods, List<CXCursor> vars, List<CXCursor> bases) CollectClassMembers(CXCursor cursor)
         {
-            if (cursor.Kind != CXCursorKind.CXCursor_ClassDecl && cursor.Kind != CXCursorKind.CXCursor_StructDecl)
-                return [];
             var methods = new List<CXCursor>();
+            var vars = new List<CXCursor>();
+            var bases = new List<CXCursor>();
+
             unsafe
             {
-                // Visit children to find method declarations
                 cursor.VisitChildren((c, parent, data) =>
                 {
-                    if (c.Kind == CXCursorKind.CXCursor_CXXMethod ||
-                        c.Kind == CXCursorKind.CXCursor_Constructor ||
-                        c.Kind == CXCursorKind.CXCursor_Destructor)
+                    switch (c.Kind)
                     {
-                        methods.Add(c);
+                        case CXCursorKind.CXCursor_CXXMethod:
+                        case CXCursorKind.CXCursor_Constructor:
+                        case CXCursorKind.CXCursor_Destructor:
+                            methods.Add(c);
+                            break;
+                        case CXCursorKind.CXCursor_FieldDecl:
+                        case CXCursorKind.CXCursor_VarDecl:
+                            if (cursor.Linkage == CXLinkageKind.CXLinkage_External && cursor.Language == CXLanguageKind.CXLanguage_C)
+                                return CXChildVisitResult.CXChildVisit_Continue;
+                            vars.Add(c);
+                            break;
+                        case CXCursorKind.CXCursor_CXXBaseSpecifier:
+                            bases.Add(c);
+                            break;
                     }
                     return CXChildVisitResult.CXChildVisit_Continue;
                 }, new CXClientData(nint.Zero));
             }
-            return [.. methods];
-        }
 
-        public CXCursor[] IterateClassVariables(CXCursor cursor)
-        {
-            if (cursor.Kind != CXCursorKind.CXCursor_ClassDecl && cursor.Kind != CXCursorKind.CXCursor_StructDecl)
-                return [];
-            var variables = new List<CXCursor>();
-            unsafe
-            {
-                // Visit children to find field declarations
-                cursor.VisitChildren((c, parent, data) =>
-                {
-                    if (c.Kind == CXCursorKind.CXCursor_FieldDecl || 
-                        c.Kind == CXCursorKind.CXCursor_VarDecl)
-                    {
-                        if (cursor.Linkage == CXLinkageKind.CXLinkage_External && cursor.Language == CXLanguageKind.CXLanguage_C)
-                            return CXChildVisitResult.CXChildVisit_Continue;
-
-                        variables.Add(c);
-                    }
-                    return CXChildVisitResult.CXChildVisit_Continue;
-                }, new CXClientData(nint.Zero));
-            }
-            return [.. variables];
+            return (methods, vars, bases);
         }
 
         public ASTClass[] GetClasses()
@@ -293,12 +271,16 @@ namespace Amethyst.SymbolGenerator.Parsing
                 // Traverse the AST
                 TranslationUnit.Cursor.VisitChildren((cursor, parent, data) =>
                 {
+                    ASTCursorLocation? location = GetLocation(cursor);
+
+                    // Ensure that the class is in the input directory
+                    string file = location?.File ?? string.Empty;
+                    if (file.StartsWith(InputDirectory, StringComparison.Ordinal) == false || !StrictHeaders.Contains(file))
+                        return CXChildVisitResult.CXChildVisit_Continue;
+
                     // Get class/struct declarations
                     if (cursor.Kind == CXCursorKind.CXCursor_ClassDecl || cursor.Kind == CXCursorKind.CXCursor_StructDecl)
                     {
-                        if (!cursor.IsDefinition)
-                            cursor = cursor.CanonicalCursor;
-
                         var usr = cursor.Usr.ToString();
                         var (result, rawClass) = VisitClass(cursor, parent, usr);
                         if (rawClass is not null)
@@ -321,12 +303,16 @@ namespace Amethyst.SymbolGenerator.Parsing
                 // Traverse the AST
                 TranslationUnit.Cursor.VisitChildren((cursor, parent, data) =>
                 {
+                    ASTCursorLocation? location = GetLocation(cursor);
+
+                    // Ensure that the class is in the input directory
+                    string file = location?.File ?? string.Empty;
+                    if (file.StartsWith(InputDirectory, StringComparison.Ordinal) == false || !StrictHeaders.Contains(file))
+                        return CXChildVisitResult.CXChildVisit_Continue;
+
                     // Get methods/free functions
                     if (cursor.Kind == CXCursorKind.CXCursor_FunctionDecl)
                     {
-                        if (!cursor.IsDefinition)
-                            cursor = cursor.CanonicalCursor;
-
                         var usr = cursor.Usr.ToString();
                         var (result, method) = VisitMethod(cursor, parent, usr);
                         if (method is not null)
@@ -349,14 +335,19 @@ namespace Amethyst.SymbolGenerator.Parsing
                 // Traverse the AST
                 TranslationUnit.Cursor.VisitChildren((cursor, parent, data) =>
                 {
+                    ASTCursorLocation? location = GetLocation(cursor);
+
+                    // Ensure that the class is in the input directory
+                    string file = location?.File ?? string.Empty;
+                    if (file.StartsWith(InputDirectory, StringComparison.Ordinal) == false || !StrictHeaders.Contains(file))
+                        return CXChildVisitResult.CXChildVisit_Continue;
+
                     // Get variable declarations
                     if (cursor.Kind == CXCursorKind.CXCursor_VarDecl)
                     {
                         if (cursor.Linkage == CXLinkageKind.CXLinkage_External && cursor.Language == CXLanguageKind.CXLanguage_C)
                             return CXChildVisitResult.CXChildVisit_Continue;
 
-                        if (!cursor.IsDefinition)
-                            cursor = cursor.CanonicalCursor;
                         var usr = cursor.Usr.ToString();
                         var (result, variable) = VisitVariable(cursor, parent, usr);
                         if (variable is not null)
@@ -373,6 +364,8 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         private (CXChildVisitResult result, ASTClass? rawClass) VisitClass(CXCursor cursor, CXCursor parent, string usr)
         {
+            cursor = GetDefinition(cursor);
+
             // Get from cache if available
             if (ClassCache.TryGetValue(usr, out var cached))
                 return (CXChildVisitResult.CXChildVisit_Continue, cached);
@@ -380,13 +373,15 @@ namespace Amethyst.SymbolGenerator.Parsing
             ASTCursorLocation? location = GetLocation(cursor);
 
             // Ensure that the class is in the input directory
-            if (location?.File.StartsWith(InputDirectory, StringComparison.Ordinal) == false)
+            string file = location?.File ?? string.Empty;
+            if (file.StartsWith(InputDirectory, StringComparison.Ordinal) == false || !StrictHeaders.Contains(file))
                 return (CXChildVisitResult.CXChildVisit_Continue, null);
 
-            string name = GetSpelling(cursor);
+            // Collect members
+            var (methodsCursors, variableCursors, baseCursors) = CollectClassMembers(cursor);
 
             // Find base classes
-            ASTBaseSpecifier[] baseClasses = [.. IterateBaseClasses(cursor)
+            ASTBaseSpecifier[] baseClasses = [.. baseCursors
                 .Select(c =>
                 {
                     bool isVirtualBase = c.IsVirtualBase;
@@ -405,7 +400,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             ).Where(t => t is not null)!];
 
             // Find methods
-            ASTMethod[] methods = [.. IterateClassMethods(cursor)
+            ASTMethod[] methods = [.. methodsCursors
                 .Select(c =>
                 {
                     var (result, method) = VisitMethod(c, cursor, c.Usr.ToString());
@@ -413,7 +408,8 @@ namespace Amethyst.SymbolGenerator.Parsing
                 }
             ).Where(t => t is not null)!];
 
-            ASTVariable[] variables = [.. IterateClassVariables(cursor)
+            // Find variables
+            ASTVariable[] variables = [.. variableCursors
                 .Select(c =>
                 {
                     var (result, variable) = VisitVariable(c, cursor, c.Usr.ToString());
@@ -421,6 +417,7 @@ namespace Amethyst.SymbolGenerator.Parsing
                 }
             ).Where(t => t is not null)!];
 
+            string name = GetSpelling(cursor);
             ASTClass rawClass = new()
             {
                 Name = name,
@@ -446,11 +443,19 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         private (CXChildVisitResult result, ASTMethod? method) VisitMethod(CXCursor cursor, CXCursor parent, string usr)
         {
+            cursor = GetDefinition(cursor);
+
             // Get from cache if available
             if (MethodCache.TryGetValue(usr, out var cached))
                 return (CXChildVisitResult.CXChildVisit_Continue, cached);
 
             ASTCursorLocation? location = GetLocation(cursor);
+
+            // Ensure that the function is in the input directory
+            string file = location?.File ?? string.Empty;
+            if (file.StartsWith(InputDirectory, StringComparison.Ordinal) == false || !StrictHeaders.Contains(file))
+                return (CXChildVisitResult.CXChildVisit_Continue, null);
+
             string name = GetSpelling(cursor);
             string mangledName = GetMangledName(cursor);
             string? rawComment = GetRawComment(cursor);
@@ -489,6 +494,8 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public (CXChildVisitResult result, ASTVariable? variable) VisitVariable(CXCursor cursor, CXCursor parent, string usr)
         {
+            cursor = GetDefinition(cursor);
+
             // Get from cache if available
             if (VariableCache.TryGetValue(usr, out var cached))
             {
@@ -499,7 +506,15 @@ namespace Amethyst.SymbolGenerator.Parsing
                 return (CXChildVisitResult.CXChildVisit_Continue, cached);
             }
 
+            if (!cursor.IsDefinition)
+                cursor = cursor.CanonicalCursor;
+
             ASTCursorLocation? location = GetLocation(cursor);
+            // Ensure that the variable is in the input directory
+            string file = location?.File ?? string.Empty;
+            if (file.StartsWith(InputDirectory, StringComparison.Ordinal) == false || !StrictHeaders.Contains(file))
+                return (CXChildVisitResult.CXChildVisit_Continue, null);
+
             string name = GetSpelling(cursor);
             string mangledName = GetMangledName(cursor);
             string? rawComment = GetRawComment(cursor);
@@ -510,9 +525,6 @@ namespace Amethyst.SymbolGenerator.Parsing
             {
                 namespaceName = GetFullNamespace(parent);
             }
-
-            if (!cursor.IsCanonical)
-                cursor = cursor.CanonicalCursor;
             
             ASTVariable variable = new()
             {

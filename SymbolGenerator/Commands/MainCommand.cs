@@ -66,7 +66,8 @@ namespace Amethyst.SymbolGenerator.Commands
                 ASTVisitor visitor = new(
                     inputFile: generatedFile,
                     inputDirectory: Input.FullName,
-                    arguments: Program.CompilerArguments
+                    arguments: Program.CompilerArguments,
+                    strictHeaders: willBeParsed
                 );
 
                 // Handle diagnostics

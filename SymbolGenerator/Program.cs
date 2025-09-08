@@ -20,7 +20,7 @@ namespace Amethyst.SymbolGenerator
 
             try
             {
-                NativeLibrary.Load("libclang");
+                //NativeLibrary.Load("libclang.dll");
             }
             catch
             {
