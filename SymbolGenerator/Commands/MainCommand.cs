@@ -56,19 +56,25 @@ namespace Amethyst.SymbolGenerator.Commands
 
             // Prepare .cpp file for parsing
             string generatedFile = Path.Combine(Output.FullName, "Generated.cpp");
-            List<string> willBeParsed = Utils.CreateIncludeFile(generatedFile, Input.FullName, addedOrModified).ToList();
+            List<string> willBeParsed = Utils.Benchmark<List<string>>("Prepare the Generated.cpp", () =>
+            {
+                return [.. Utils.CreateIncludeFile(generatedFile, Input.FullName, addedOrModified)];
+            });
 
             ASTMethod[] methods = [];
             ASTVariable[] variables = [];
-            Utils.Benchmark("AST Parsing", () =>
+            Utils.Benchmark("Parse the AST", () =>
             {
                 // Parse the generated .cpp file
-                ASTVisitor visitor = new(
-                    inputFile: generatedFile,
-                    inputDirectory: Input.FullName,
-                    arguments: Program.CompilerArguments,
-                    strictHeaders: willBeParsed
-                );
+                ASTVisitor visitor = Utils.Benchmark<ASTVisitor>("Create the Translation Unit", () =>
+                {
+                    return new(
+                        inputFile: generatedFile,
+                        inputDirectory: Input.FullName,
+                        arguments: Program.CompilerArguments,
+                        strictHeaders: willBeParsed
+                    );
+                });
 
                 // Handle diagnostics
                 if (visitor.PrintErrors())
@@ -78,16 +84,16 @@ namespace Amethyst.SymbolGenerator.Commands
                 }
 
                 // Traverse the AST and collect classes, variables and methods
-                _ = visitor.GetClasses();
-                _ = visitor.GetVariables();
-                _ = visitor.GetMethods();
+                Utils.Benchmark("Collect variables", () => visitor.GetVariables());
+                Utils.Benchmark("Collect classes", () => visitor.GetClasses());
+                Utils.Benchmark("Collect methods", () => visitor.GetMethods());
 
                 methods = [.. visitor.Methods];
                 variables = [.. visitor.Variables];
             });
 
             List<RawAnnotation> annotations = [];
-            Utils.Benchmark("Comment Parsing", () =>
+            Utils.Benchmark("Parse the comments", () =>
             {
                 // Extract annotations from methods
                 foreach (var method in methods)
@@ -117,7 +123,7 @@ namespace Amethyst.SymbolGenerator.Commands
             });
 
             Dictionary<string, List<object>> annotationsData = [];
-            Utils.Benchmark("Process Annotations", () =>
+            Utils.Benchmark("Process annotations", () =>
             {
                 // Process extracted annotations
                 var processedAnnotations = AnnotationProcessor.ProcessAnnotations(annotations);
@@ -138,7 +144,7 @@ namespace Amethyst.SymbolGenerator.Commands
                 }
             });
 
-            Utils.Benchmark("Generate Output", () =>
+            Utils.Benchmark("Generate symbols", () =>
             {
                 JsonSerializerSettings jsonSettings = new()
                 {

@@ -33,7 +33,8 @@ namespace Amethyst.SymbolGenerator.Parsing
                 inputFile,
                 arguments.ToArray(),
                 [],
-                CXTranslationUnit_Flags.CXTranslationUnit_DetailedPreprocessingRecord,
+                CXTranslationUnit_Flags.CXTranslationUnit_DetailedPreprocessingRecord |
+                CXTranslationUnit_Flags.CXTranslationUnit_SkipFunctionBodies,
                 out var translationUnit);
             if (error != CXErrorCode.CXError_Success)
                 throw new Exception($"Failed to parse translation unit. Error code: {error}");
@@ -343,8 +344,6 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         private (CXChildVisitResult result, ASTClass? rawClass) VisitClass(CXCursor cursor, CXCursor parent, string usr)
         {
-            cursor = GetDefinition(cursor);
-
             // Get from cache if available
             if (ClassCache.TryGetValue(usr, out var cached))
                 return (CXChildVisitResult.CXChildVisit_Continue, cached);
@@ -422,8 +421,6 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         private (CXChildVisitResult result, ASTMethod? method) VisitMethod(CXCursor cursor, CXCursor parent, string usr)
         {
-            cursor = GetDefinition(cursor);
-
             // Get from cache if available
             if (MethodCache.TryGetValue(usr, out var cached))
                 return (CXChildVisitResult.CXChildVisit_Continue, cached);
@@ -462,7 +459,7 @@ namespace Amethyst.SymbolGenerator.Parsing
                 IsVirtual = cursor.CXXMethod_IsVirtual,
                 RawComment = rawComment,
                 IsImported = isImported,
-                HasBody = HasBody(cursor),
+                HasBody = false,
                 Namespace = namespaceName,
                 IsDestructor = isDestructor
             };
@@ -473,8 +470,6 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public (CXChildVisitResult result, ASTVariable? variable) VisitVariable(CXCursor cursor, CXCursor parent, string usr)
         {
-            cursor = GetDefinition(cursor);
-
             // Get from cache if available
             if (VariableCache.TryGetValue(usr, out var cached))
             {
@@ -484,9 +479,6 @@ namespace Amethyst.SymbolGenerator.Parsing
                 }
                 return (CXChildVisitResult.CXChildVisit_Continue, cached);
             }
-
-            if (!cursor.IsDefinition)
-                cursor = cursor.CanonicalCursor;
 
             ASTCursorLocation? location = GetLocation(cursor);
             // Ensure that the variable is in the input directory
