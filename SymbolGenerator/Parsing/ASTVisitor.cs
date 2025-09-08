@@ -271,13 +271,6 @@ namespace Amethyst.SymbolGenerator.Parsing
                 // Traverse the AST
                 TranslationUnit.Cursor.VisitChildren((cursor, parent, data) =>
                 {
-                    ASTCursorLocation? location = GetLocation(cursor);
-
-                    // Ensure that the class is in the input directory
-                    string file = location?.File ?? string.Empty;
-                    if (file.StartsWith(InputDirectory, StringComparison.Ordinal) == false || !StrictHeaders.Contains(file))
-                        return CXChildVisitResult.CXChildVisit_Continue;
-
                     // Get class/struct declarations
                     if (cursor.Kind == CXCursorKind.CXCursor_ClassDecl || cursor.Kind == CXCursorKind.CXCursor_StructDecl)
                     {
@@ -303,13 +296,6 @@ namespace Amethyst.SymbolGenerator.Parsing
                 // Traverse the AST
                 TranslationUnit.Cursor.VisitChildren((cursor, parent, data) =>
                 {
-                    ASTCursorLocation? location = GetLocation(cursor);
-
-                    // Ensure that the class is in the input directory
-                    string file = location?.File ?? string.Empty;
-                    if (file.StartsWith(InputDirectory, StringComparison.Ordinal) == false || !StrictHeaders.Contains(file))
-                        return CXChildVisitResult.CXChildVisit_Continue;
-
                     // Get methods/free functions
                     if (cursor.Kind == CXCursorKind.CXCursor_FunctionDecl)
                     {
@@ -335,13 +321,6 @@ namespace Amethyst.SymbolGenerator.Parsing
                 // Traverse the AST
                 TranslationUnit.Cursor.VisitChildren((cursor, parent, data) =>
                 {
-                    ASTCursorLocation? location = GetLocation(cursor);
-
-                    // Ensure that the class is in the input directory
-                    string file = location?.File ?? string.Empty;
-                    if (file.StartsWith(InputDirectory, StringComparison.Ordinal) == false || !StrictHeaders.Contains(file))
-                        return CXChildVisitResult.CXChildVisit_Continue;
-
                     // Get variable declarations
                     if (cursor.Kind == CXCursorKind.CXCursor_VarDecl)
                     {
