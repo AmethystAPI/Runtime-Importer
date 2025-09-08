@@ -73,6 +73,14 @@ namespace Amethyst.LibraryGenerator.Commands
                                 Logger.Info("Adding symbol: " + function.Name);
                                 allMangledNames.Add(function.Name);
                             }
+
+                            foreach (var variable in symbolJson.Variables)
+                            {
+                                if (string.IsNullOrEmpty(variable.Name))
+                                    continue;
+                                Logger.Info("Adding symbol: " + variable.Name);
+                                allMangledNames.Add(variable.Name);
+                            }
                             break;
                     }
                 }

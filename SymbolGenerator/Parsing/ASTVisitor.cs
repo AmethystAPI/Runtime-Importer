@@ -271,8 +271,12 @@ namespace Amethyst.SymbolGenerator.Parsing
                 // Visit children to find field declarations
                 cursor.VisitChildren((c, parent, data) =>
                 {
-                    if (c.Kind == CXCursorKind.CXCursor_FieldDecl || c.Kind == CXCursorKind.CXCursor_VarDecl)
+                    if (c.Kind == CXCursorKind.CXCursor_FieldDecl || 
+                        c.Kind == CXCursorKind.CXCursor_VarDecl)
                     {
+                        if (cursor.Linkage == CXLinkageKind.CXLinkage_External && cursor.Language == CXLanguageKind.CXLanguage_C)
+                            return CXChildVisitResult.CXChildVisit_Continue;
+
                         variables.Add(c);
                     }
                     return CXChildVisitResult.CXChildVisit_Continue;
@@ -348,6 +352,9 @@ namespace Amethyst.SymbolGenerator.Parsing
                     // Get variable declarations
                     if (cursor.Kind == CXCursorKind.CXCursor_VarDecl)
                     {
+                        if (cursor.Linkage == CXLinkageKind.CXLinkage_External && cursor.Language == CXLanguageKind.CXLanguage_C)
+                            return CXChildVisitResult.CXChildVisit_Continue;
+
                         if (!cursor.IsDefinition)
                             cursor = cursor.CanonicalCursor;
                         var usr = cursor.Usr.ToString();
@@ -448,6 +455,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             string mangledName = GetMangledName(cursor);
             string? rawComment = GetRawComment(cursor);
             bool isImported = IsImported(cursor);
+            bool isDestructor = cursor.Kind == CXCursorKind.CXCursor_Destructor;
             string? namespaceName = null;
             if (parent.Kind == CXCursorKind.CXCursor_Namespace)
             {
@@ -471,7 +479,8 @@ namespace Amethyst.SymbolGenerator.Parsing
                 RawComment = rawComment,
                 IsImported = isImported,
                 HasBody = HasBody(cursor),
-                Namespace = namespaceName
+                Namespace = namespaceName,
+                IsDestructor = isDestructor
             };
 
             MethodCache[usr] = method;
@@ -492,7 +501,7 @@ namespace Amethyst.SymbolGenerator.Parsing
 
             ASTCursorLocation? location = GetLocation(cursor);
             string name = GetSpelling(cursor);
-            string mangledName = "Unknown";
+            string mangledName = GetMangledName(cursor);
             string? rawComment = GetRawComment(cursor);
             bool isImported = IsImported(cursor);
             string? namespaceName = null;

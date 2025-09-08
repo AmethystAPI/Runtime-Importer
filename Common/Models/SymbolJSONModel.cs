@@ -9,5 +9,9 @@ namespace Amethyst.Common.Models
 
         [JsonProperty("functions")]
         public List<MethodSymbolJSONModel> Functions { get; set; } = [];
+
+        [JsonProperty("variables")]
+        public List<VariableSymbolJSONModel> Variables { get; set; } = [];
+
     }
 }

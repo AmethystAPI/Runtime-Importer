@@ -100,6 +100,19 @@ namespace Amethyst.SymbolGenerator.Commands
                     }
                     annotations.AddRange(anns);
                 }
+
+                // Extract annotations from variables
+                foreach (var variable in variables)
+                {
+                    if (variable.RawComment is null || variable.Location is null || !willBeParsed.Contains(variable.Location.File))
+                        continue;
+                    RawAnnotation[] anns = CommentParser.ParseAnnotations(variable.RawComment, variable.Location ?? new("Unknown File", 0, 0, 0)).ToArray();
+                    for (int i = 0; i < anns.Length; i++)
+                    {
+                        anns[i].Target = variable;
+                    }
+                    annotations.AddRange(anns);
+                }
             });
 
             Dictionary<string, List<object>> annotationsData = [];
@@ -141,6 +154,7 @@ namespace Amethyst.SymbolGenerator.Commands
                     {
                         FormatVersion = 1,
                         Functions = [.. data.OfType<MethodSymbolJSONModel>()],
+                        Variables = [.. data.OfType<VariableSymbolJSONModel>()]
                     }, Formatting.Indented, jsonSettings);
                     File.WriteAllText(outputFilePath, json);
                     Logger.Info($"Generated: {outputFilePath}");

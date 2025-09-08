@@ -37,6 +37,7 @@ namespace Amethyst.ModuleTweaker.Commands
             // Collect all symbol files and accumulate mangled names
             IEnumerable<FileInfo> symbolFiles = symbols.EnumerateFiles("*.json", SearchOption.AllDirectories);
             HashSet<MethodSymbolJSONModel> methods = [];
+            HashSet<VariableSymbolJSONModel> variables = [];
             foreach (var symbolFile in symbolFiles)
             {
                 using var stream = symbolFile.OpenRead();
@@ -53,6 +54,12 @@ namespace Amethyst.ModuleTweaker.Commands
                                     continue;
                                 methods.Add(function);
                             }
+                            foreach (var variable in symbolJson.Variables)
+                            {
+                                if (string.IsNullOrEmpty(variable.Name))
+                                    continue;
+                                variables.Add(variable);
+                            }
                             break;
                     }
                 }
@@ -63,7 +70,7 @@ namespace Amethyst.ModuleTweaker.Commands
                 // Patch the module
                 var file = PEFile.FromFile(ModulePath);
                 PEFileHelper helper = new(file);
-                if (helper.Patch(methods))
+                if (helper.Patch(methods, variables))
                 {
                     file.AlignSections();
                     File.Copy(ModulePath, ModulePath + ".backup", true);

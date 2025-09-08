@@ -7,6 +7,7 @@ using AsmResolver.PE.File;
 using AsmResolver.PE.File.Headers;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,12 +16,14 @@ namespace Amethyst.ModuleTweaker.Patching
 {
     public class PEFileHelper(PEFile file)
     {
+        public const string RuntimeImportVariableDescriptorTableName = ".rivdt";
         public const string RuntimeImportFunctionDescriptorTableName = ".rifdt";
         public const string RuntimeImportMangleTableName = ".rimt";
         public const string RuntimeImportSignatureTableName = ".rist";
         public const string NewImportDescriptorTableName = ".idnew";
         public static HashSet<string> SectionNames = new()
         {
+            RuntimeImportVariableDescriptorTableName,
             RuntimeImportFunctionDescriptorTableName,
             RuntimeImportMangleTableName,
             RuntimeImportSignatureTableName,
@@ -73,7 +76,7 @@ namespace Amethyst.ModuleTweaker.Patching
             File.AlignSections();
         }
 
-        public bool Patch(IEnumerable<MethodSymbolJSONModel> methodSymbols)
+        public bool Patch(IEnumerable<MethodSymbolJSONModel> methodSymbols, IEnumerable<VariableSymbolJSONModel> variableSymbols)
         {
             if (IsPatched())
             {
@@ -151,6 +154,7 @@ namespace Amethyst.ModuleTweaker.Patching
             }
 
             MethodSymbolJSONModel[] methods = [.. methodSymbols];
+            VariableSymbolJSONModel[] variables = [.. variableSymbols];
 
             // Create mangle table section
             // Contains all mangled names of functions to be resolved at runtime
@@ -164,11 +168,17 @@ namespace Amethyst.ModuleTweaker.Patching
                 var writer = new BinaryStreamWriter(ms);
                 uint countPosition = (uint)ms.Position;
                 writer.WriteUInt32(0u); // Placeholder for count
-                for (uint i = 0; i < methods.Length; i++)
+                uint index = 0;
+                foreach (var method in methods)
                 {
-                    var method = methods[i];
                     writer.WriteBytes([.. Encoding.ASCII.GetBytes(method.Name), 0]);
-                    nameToIndex[method.Name] = i;
+                    nameToIndex[method.Name] = index++;
+                }
+
+                foreach (var variable in variables)
+                {
+                    writer.WriteBytes([.. Encoding.ASCII.GetBytes(variable.Name), 0]);
+                    nameToIndex[variable.Name] = index++;
                 }
 
                 // Go back and write the count
@@ -178,7 +188,7 @@ namespace Amethyst.ModuleTweaker.Patching
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
                 Logger.Info($"Created mangle table section ({RuntimeImportMangleTableName}).");
-                Logger.Info($"Added {methods.Length} mangled names to mangle table.");
+                Logger.Info($"Added {index} mangled names to mangle table.");
             }
 
             // Create signature table section
@@ -225,9 +235,8 @@ namespace Amethyst.ModuleTweaker.Patching
                 writer.WriteUInt32(iatRva);
                 writer.WriteUInt32(iatSize);
                 uint count = 0;
-                for (uint i = 0; i < methods.Length; i++)
+                foreach (var method in methods)
                 {
-                    var method = methods[i];
                     if (!nameToIatIndex.ContainsKey(method.Name))
                     {
                         Logger.Warn($"Skipping method '{method.Name}' as it does not exist in the import table of 'Minecraft.Windows.exe'.");
@@ -270,7 +279,61 @@ namespace Amethyst.ModuleTweaker.Patching
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
                 Logger.Info($"Created function descriptor table section ({RuntimeImportFunctionDescriptorTableName}).");
-                Logger.Info($"Added {methods.Length} function descriptors to function descriptor table.");
+                Logger.Info($"Added {count} function descriptors to function descriptor table.");
+            }
+
+            // Create variable descriptor table section
+            // Contains descriptors for all variables to be resolved at runtime
+            {
+                PESection section = new(
+                    RuntimeImportVariableDescriptorTableName,
+                    SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
+                using var ms = new MemoryStream();
+                var writer = new BinaryStreamWriter(ms);
+                uint countPosition = (uint)ms.Position;
+                writer.WriteUInt32(0u); // Placeholder for count
+                writer.WriteUInt32(iatRva);
+                writer.WriteUInt32(iatSize);
+                uint count = 0;
+                foreach (var variable in variables)
+                {
+                    if (!nameToIatIndex.ContainsKey(variable.Name))
+                    {
+                        Logger.Warn($"Skipping variable '{variable.Name}' as it does not exist in the import table of 'Minecraft.Windows.exe'.");
+                        continue;
+                    }
+
+                    uint nameIndex = nameToIndex[variable.Name];
+                    uint iatIndex = nameToIatIndex[variable.Name];
+
+                    writer.WriteUInt32(nameIndex);
+                    writer.WriteUInt32(iatIndex);
+                    string address = variable.Address.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? variable.Address[2..] : variable.Address;
+                    try
+                    {
+                        ulong addressValue = ulong.Parse(address, NumberStyles.HexNumber);
+                        writer.WriteUInt64(addressValue);
+                    }
+                    catch (Exception)
+                    {
+                        writer.WriteUInt64(0x0);
+                    }
+
+                    // uint: NameIndex
+                    // uint: IATIndex
+                    // ulong: Address
+                    count++;
+                    Logger.Info($"Added runtime import for variable: " + variable.Name);
+                }
+
+                // Go back and write the count
+                ms.Seek(countPosition, SeekOrigin.Begin);
+                writer.WriteUInt32(count);
+
+                section.Contents = new DataSegment(ms.ToArray());
+                File.Sections.Add(section);
+                Logger.Info($"Created variable descriptor table section ({RuntimeImportVariableDescriptorTableName}).");
+                Logger.Info($"Added {count} variable descriptors to variable descriptor table.");
             }
 
             // Create new import descriptor table section

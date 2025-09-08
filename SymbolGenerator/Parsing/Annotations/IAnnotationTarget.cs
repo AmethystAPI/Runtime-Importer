@@ -10,6 +10,7 @@
         bool IsClass { get; }
         bool IsMethod { get; }
         bool IsVariable { get; }
+        bool IsImported { get; }
         ASTCursorLocation? Location { get; }
         HashSet<string> HandledAnnotations { get; set; }
     }

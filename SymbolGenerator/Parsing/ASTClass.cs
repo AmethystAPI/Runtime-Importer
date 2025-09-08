@@ -28,6 +28,8 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public bool IsVariable => false;
 
+        public bool IsImported => false;
+
         public bool OwnsAtLeastOneVirtualMethod()
         {
             return Methods.Any(m => m.IsVirtual);
