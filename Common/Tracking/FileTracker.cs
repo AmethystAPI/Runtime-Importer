@@ -10,6 +10,8 @@ namespace Amethyst.Common.Tracking
     /// </summary>
     public class FileTracker
     {
+        public const int CurrentVersion = 1;
+
         public DirectoryInfo InputDirectory { get; private set; }
         public FileInfo ChecksumFile { get; private set; }
         public string[] SearchPatterns { get; private set; }
@@ -34,6 +36,21 @@ namespace Amethyst.Common.Tracking
             // Load existing checksums
             Dictionary<string, ulong> lastChecksums = LoadChecksums();
             Dictionary<string, ulong> newChecksums = [];
+            if (lastChecksums.TryGetValue("__version", out var version))
+            {
+                // Version found, check if it matches current version
+                lastChecksums.Remove("__version");
+                if (version != CurrentVersion)
+                {
+                    // Version mismatch, reset checksums
+                    lastChecksums = [];
+                }
+            }
+            else
+            {
+                // No version found, assume old format and reset
+                lastChecksums = [];
+            }
 
             // Collect all files matching the search patterns
             IEnumerable<FileInfo> files = SearchPatterns
@@ -96,6 +113,8 @@ namespace Amethyst.Common.Tracking
 
         public void SaveChecksums(Dictionary<string, ulong> checksums)
         {
+            // Always set the current version
+            checksums["__version"] = CurrentVersion;
             var json = JsonConvert.SerializeObject(checksums, Formatting.Indented);
             if (ChecksumFile.DirectoryName is not string checksumDirectory)
                 throw new Exception("Failed to get directory name for checksum file.");
