@@ -30,7 +30,7 @@ jobs:
     - name: Publish
       run: dotnet publish -c Release -o out
 
-    - name: Copy clang
+    - name: Copy utility files
       run: cp -r ./Utility/* ./out/
 
     - name: Zip binaries
