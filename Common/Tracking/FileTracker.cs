@@ -1,6 +1,7 @@
 ﻿using Amethyst.Common.Extensions;
 using K4os.Hash.xxHash;
 using Newtonsoft.Json;
+using System.Reflection;
 using System.Text;
 
 namespace Amethyst.Common.Tracking
@@ -10,7 +11,15 @@ namespace Amethyst.Common.Tracking
     /// </summary>
     public class FileTracker
     {
-        public const int CurrentVersion = 1;
+        public static Version AssemblyVersion => Assembly.GetEntryAssembly()?.GetName()?.Version ?? new Version(1, 0, 0);
+        public static ulong CurrentVersion
+        {
+            get
+            {
+                Version version = AssemblyVersion;
+                return (ulong)((version.Major << 32) | (version.Minor << 16) | version.Build);
+            }
+        }
 
         public DirectoryInfo InputDirectory { get; private set; }
         public FileInfo ChecksumFile { get; private set; }
