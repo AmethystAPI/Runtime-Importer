@@ -54,10 +54,21 @@ namespace Amethyst.SymbolGenerator.Parsing
             {
                 yield return baseClass;
                 foreach (var ancestor in baseClass.Class.GetAncestors())
+                {
                     yield return ancestor;
+                }
             }
         }
 
-        
+        public int DistinctPolymorphicAncestorCount()
+        {
+            HashSet<ASTClass> distinctAncestors = new();
+            foreach (var ancestor in GetAncestors())
+            {
+                if (ancestor.Class.OwnsAtLeastOneVirtualMethod())
+                    distinctAncestors.Add(ancestor.Class);
+            }
+            return distinctAncestors.Count;
+        }
     }
 }
