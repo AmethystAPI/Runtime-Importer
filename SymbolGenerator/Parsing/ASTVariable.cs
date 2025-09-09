@@ -10,7 +10,6 @@ namespace Amethyst.SymbolGenerator.Parsing
         public ASTClass? DeclaringClass { get; set; } = null;
         public ASTCursorLocation? Location { get; set; } = null;
         public bool IsImported { get; set; } = false;
-        public bool HasDefinition { get; set; } = false;
         public string? RawComment { get; set; } = null;
         public bool IsStatic { get; set; } = false;
 

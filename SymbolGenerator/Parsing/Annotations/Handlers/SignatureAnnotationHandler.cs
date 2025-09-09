@@ -15,8 +15,6 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
                 throw new ArgumentException("Annotation target method is null.");
             if (!annotation.Target.Method.IsImported)
                 throw new ArgumentException("Signature annotation can only be applied to imported methods.");
-            if (annotation.Target.Method.HasBody)
-                throw new ArgumentException("Signature annotation can only be applied to body-less methods.");
             if (args.Length != 1)
                 throw new ArgumentException($"Signature annotation requires exactly one argument. Received {args.Length}");
             if (string.IsNullOrWhiteSpace(args[0]))

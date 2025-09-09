@@ -9,6 +9,7 @@ namespace Amethyst.SymbolGenerator.Parsing
         public ASTCursorLocation? Location { get; set; }
         public ASTBaseSpecifier[] DirectBaseClasses { get; set; } = [];
         public ASTMethod[] Methods { get; set; } = [];
+        public ASTVariable[] Variables { get; set; } = [];
 
         public string FullName => string.IsNullOrEmpty(Namespace) ? Name! : $"{Namespace}::{Name}";
 

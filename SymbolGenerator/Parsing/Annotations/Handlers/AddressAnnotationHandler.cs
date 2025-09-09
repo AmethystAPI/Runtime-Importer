@@ -14,8 +14,6 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
                 throw new ArgumentException("Annotation target method or variable is null.");
             if (!annotation.Target.IsImported)
                 throw new ArgumentException("Address annotation can only be applied to imported methods or variables.");
-            if (annotation.Target.IsMethod && annotation.Target.Method!.HasBody)
-                throw new ArgumentException("Address annotation can only be applied to body-less methods.");
             if (annotation.Target.IsVariable && annotation.Target.Variable!.DeclaringClass is not null && !annotation.Target.Variable.IsStatic)
                 throw new ArgumentException("Address annotation can only be applied to static or global variables.");
             if (args.Length != 1)

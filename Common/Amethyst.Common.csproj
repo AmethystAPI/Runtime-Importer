@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>Amethyst.Common</AssemblyName>
     <RootNamespace>Amethyst.Common</RootNamespace>
+    <Version>1.0.3</Version>
   </PropertyGroup>
 
   <ItemGroup>
