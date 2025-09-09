@@ -28,7 +28,10 @@ jobs:
       run: dotnet test --no-build --verbosity normal
 
     - name: Publish
-      run: dotnet publish -c Release -o out
+      run: dotnet publish -c Release -o out -r win-x64
+
+    - name: Copy utility files
+      run: cp -r ./Utility/* ./out/
 
     - name: Zip binaries
       run: |
