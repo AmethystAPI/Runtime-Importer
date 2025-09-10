@@ -13,5 +13,10 @@ namespace Amethyst.Common.Models
         [JsonProperty("variables")]
         public List<VariableSymbolJSONModel> Variables { get; set; } = [];
 
+        [JsonProperty("vtables")]
+        public List<VirtualTableSymbolJSONModel> VirtualTables { get; set; } = [];
+
+        [JsonProperty("virtual_functions")]
+        public List<VirtualIndexSymbolJSONModel> VirtualFunctions { get; set; } = [];
     }
 }

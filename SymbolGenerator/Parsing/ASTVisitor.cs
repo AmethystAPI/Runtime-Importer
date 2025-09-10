@@ -396,6 +396,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             ASTClass rawClass = new()
             {
                 Name = GetSpelling(cursor),
+                RawComment = GetRawComment(cursor),
                 Namespace = parent.Kind == CXCursorKind.CXCursor_Namespace ? GetFullNamespace(parent) : null,
                 Location = location,
                 DirectBaseClasses = [.. baseClasses],
@@ -416,6 +417,18 @@ namespace Amethyst.SymbolGenerator.Parsing
             if (MethodCache.TryGetValue(usr, out var cached))
                 return (CXChildVisitResult.CXChildVisit_Continue, cached);
 
+            ASTMethod? overrideOf = null;
+            if (cursor.CXXMethod_IsVirtual)
+            {
+                var overriden = cursor.OverriddenCursors;
+                if (overriden.Length > 0)
+                {
+                    var first = overriden[0];
+                    var (_, overrideOfMethod) = VisitMethod(first, first.SemanticParent, first.Usr.ToString());
+                    overrideOf = overrideOfMethod;
+                }
+            }
+
             ASTMethod method = new()
             {
                 Name = GetSpelling(cursor),
@@ -426,7 +439,8 @@ namespace Amethyst.SymbolGenerator.Parsing
                 RawComment = GetRawComment(cursor),
                 IsImported = IsImported(cursor),
                 Namespace = parent.Kind == CXCursorKind.CXCursor_Namespace ? GetFullNamespace(parent) : null,
-                IsDestructor = cursor.Kind == CXCursorKind.CXCursor_Destructor
+                IsDestructor = cursor.Kind == CXCursorKind.CXCursor_Destructor,
+                OverrideOf = overrideOf
             };
 
             MethodCache[usr] = method;

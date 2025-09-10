@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
+using System.Text.RegularExpressions;
 
 namespace Amethyst.SymbolGenerator.Parsing.Annotations
 {
@@ -14,8 +15,6 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations
                 Match match = AnnotationRegex().Match(line);
                 if (!match.Success)
                 {
-                    //Logger.Warning($"Unrecognized annotation format: {line}");
-                    //Logger.Warning($"  at: {location.File}:{location.Line}:{location.Column}:{location.Offset}");
                     continue;
                 }
 

@@ -8,6 +8,7 @@ using Amethyst.Common.Utility;
 using Amethyst.SymbolGenerator.Parsing.Annotations;
 using Newtonsoft.Json;
 using Amethyst.Common.Models;
+using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
 
 namespace Amethyst.SymbolGenerator.Commands
 {
@@ -63,6 +64,7 @@ namespace Amethyst.SymbolGenerator.Commands
 
             ASTMethod[] methods = [];
             ASTVariable[] variables = [];
+            ASTClass[] classes = [];
             Utils.Benchmark("Parse the AST", () =>
             {
                 // Parse the generated .cpp file
@@ -90,33 +92,47 @@ namespace Amethyst.SymbolGenerator.Commands
 
                 methods = [.. visitor.Methods];
                 variables = [.. visitor.Variables];
+                classes = [.. visitor.Classes];
             });
 
             List<RawAnnotation> annotations = [];
             Utils.Benchmark("Parse the comments", () =>
             {
-                // Extract annotations from methods
-                foreach (var method in methods)
-                {
-                    if (method.RawComment is null || method.Location is null || !willBeParsed.Contains(method.Location.File))
-                        continue;
-                    RawAnnotation[] anns = CommentParser.ParseAnnotations(method.RawComment, method.Location ?? new("Unknown File", 0, 0, 0)).ToArray();
-                    for (int i = 0; i < anns.Length; i++)
-                    {
-                        anns[i].Target = method;
-                    }
-                    annotations.AddRange(anns);
-                }
-
                 // Extract annotations from variables
                 foreach (var variable in variables)
                 {
                     if (variable.RawComment is null || variable.Location is null || !willBeParsed.Contains(variable.Location.File))
                         continue;
-                    RawAnnotation[] anns = CommentParser.ParseAnnotations(variable.RawComment, variable.Location ?? new("Unknown File", 0, 0, 0)).ToArray();
+                    RawAnnotation[] anns = CommentParser.ParseAnnotations(variable.RawComment, variable.Location).ToArray();
                     for (int i = 0; i < anns.Length; i++)
                     {
                         anns[i].Target = variable;
+                    }
+                    annotations.AddRange(anns);
+                }
+
+                // Extract annotations from classes
+                foreach (var cls in classes)
+                {
+                    if (cls.RawComment is null || cls.Location is null)
+                        continue;
+                    RawAnnotation[] anns = CommentParser.ParseAnnotations(cls.RawComment, cls.Location).ToArray();
+                    for (int i = 0; i < anns.Length; i++)
+                    {
+                        anns[i].Target = cls;
+                    }
+                    annotations.AddRange(anns);
+                }
+
+                // Extract annotations from non-virtual methods
+                foreach (var method in methods)
+                {
+                    if (method.RawComment is null || method.Location is null)
+                        continue;
+                    RawAnnotation[] anns = CommentParser.ParseAnnotations(method.RawComment, method.Location).ToArray();
+                    for (int i = 0; i < anns.Length; i++)
+                    {
+                        anns[i].Target = method;
                     }
                     annotations.AddRange(anns);
                 }
@@ -126,15 +142,16 @@ namespace Amethyst.SymbolGenerator.Commands
             Utils.Benchmark("Process annotations", () =>
             {
                 // Process extracted annotations
-                var processedAnnotations = AnnotationProcessor.ProcessAnnotations(annotations);
-                foreach (var processed in processedAnnotations)
+                var processor = new AnnotationProcessor();
+                Utils.Benchmark("Process and resolve annotations", () => processor.ProcessAndResolve(annotations));
+                foreach (var processed in processor.ProcessedAnnotations)
                 {
                     if (processed is null)
                         continue;
 
                     if (processed.Target.Location is not { } location || location.File == "Unknown File")
                     {
-                        Logger.Warn($"Skipping annotation for '{processed.Target.FullName}' due to unknown location.");
+                        Logger.Warn($"Skipping annotation for '{processed.Target}' due to unknown location.");
                         continue;
                     }
 
@@ -161,7 +178,9 @@ namespace Amethyst.SymbolGenerator.Commands
                     {
                         FormatVersion = 1,
                         Functions = [.. data.OfType<MethodSymbolJSONModel>()],
-                        Variables = [.. data.OfType<VariableSymbolJSONModel>()]
+                        Variables = [.. data.OfType<VariableSymbolJSONModel>()],
+                        VirtualTables = [.. data.OfType<VirtualTableSymbolJSONModel>()],
+                        VirtualFunctions = [.. data.OfType<VirtualIndexSymbolJSONModel>()],
                     }, Formatting.Indented, jsonSettings);
                     File.WriteAllText(outputFilePath, json);
                     Logger.Info($"Generated: {outputFilePath}");

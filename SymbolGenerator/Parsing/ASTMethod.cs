@@ -2,20 +2,19 @@
 
 namespace Amethyst.SymbolGenerator.Parsing
 {
-    public class ASTMethod : IAnnotationTarget
+    public class ASTMethod : AbstractAnnotationTarget
     {
         public string Name { get; set; } = null!;
         public string MangledName { get; set; } = null!;
         public string? Namespace { get; set; } = null;
         public ASTClass? DeclaringClass { get; set; } = null;
-        public ASTCursorLocation? Location { get; set; } = null;
+        public override ASTCursorLocation? Location { get; set; } = null;
         public bool IsVirtual { get; set; } = false;
         public bool IsImported { get; set; } = false;
         public bool IsDestructor { get; set; } = false;
         public string? RawComment { get; set; } = null;
-
+        public ASTMethod? OverrideOf { get; set; }
         public bool IsFreeFunction => DeclaringClass is null;
-
         public string FullName
         {
             get
@@ -31,18 +30,29 @@ namespace Amethyst.SymbolGenerator.Parsing
             }
         }
 
-        public ASTClass? Class => DeclaringClass;
+        public static List<ASTMethod> SortNonOverridesFirst(IEnumerable<ASTMethod> methods)
+        {
+            var sorted = new List<ASTMethod>();
+            var visited = new HashSet<ASTMethod>();
+            void Visit(ASTMethod method)
+            {
+                if (visited.Contains(method))
+                    return;
+                if (method.OverrideOf is not null)
+                    Visit(method.OverrideOf);
+                visited.Add(method);
+                sorted.Add(method);
+            }
+            foreach (var method in methods)
+            {
+                Visit(method);
+            }
+            return sorted;
+        }
 
-        public ASTMethod? Method => this;
-
-        public bool IsClass => false;
-
-        public bool IsMethod => true;
-
-        public HashSet<string> HandledAnnotations { get; set; } = [];
-
-        public ASTVariable? Variable => null;
-
-        public bool IsVariable => false;
+        public override string ToString()
+        {
+            return FullName;
+        }
     }
 }

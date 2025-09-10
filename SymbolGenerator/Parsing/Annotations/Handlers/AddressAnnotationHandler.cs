@@ -1,48 +1,65 @@
 ﻿using Amethyst.Common.Models;
+using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
 
 namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
 {
-    [AnnotationHandler("address", ["signature"])]
-    public class AddressAnnotationHandler : IAnnotationHandler
+    [AnnotationHandler("address", ["addr", "absolute", "abs", "at"])]
+    public class AddressAnnotationHandler(AnnotationProcessor processor) : AbstractAnnotationHandler(processor)
     {
-        public bool CanApply(RawAnnotation annotation)
+        public override void CanHandle(RawAnnotation annotation)
         {
-            var args = annotation.Arguments.ToArray();
-            if (!annotation.Target.IsMethod & !annotation.Target.IsVariable)
-                throw new ArgumentException($"Address annotation can only be applied to methods or variables. Applied to {annotation.Target.GetType().Name} instead.");
-            if (annotation.Target.Method is null & annotation.Target.Variable is null)
-                throw new ArgumentException("Annotation target method or variable is null.");
-            if (!annotation.Target.IsImported)
-                throw new ArgumentException("Address annotation can only be applied to imported methods or variables.");
-            if (annotation.Target.IsVariable && annotation.Target.Variable!.DeclaringClass is not null && !annotation.Target.Variable.IsStatic)
-                throw new ArgumentException("Address annotation can only be applied to static or global variables.");
+            if (annotation.Target is ASTMethod method)
+            {
+                if (!method.IsImported)
+                    throw new UnhandledAnnotationException("Address annotation can only be applied to imported methods.", annotation);
+            }
+            else if (annotation.Target is ASTVariable variable)
+            {
+                if (!variable.IsImported)
+                    throw new UnhandledAnnotationException("Address annotation can only be applied to imported variables.", annotation);
+            }
+            else
+            {
+                throw new UnhandledAnnotationException($"Address annotation can only be applied to methods or variables. Applied to {annotation.Target.GetType().Name} instead.", annotation);
+            }
+
+            if (annotation.Target.HasAnyOfAnnotations([annotation.Tag, "signature"]))
+                throw new UnhandledAnnotationException($"Multiple address or signature annotations applied to the same target {annotation.Target}.", annotation);
+            
+            string[] args = [.. annotation.Arguments];
             if (args.Length != 1)
-                throw new ArgumentException($"Address annotation requires exactly one argument. Received {args.Length}");
-            return true;
+                throw new UnhandledAnnotationException($"Address annotation requires exactly one argument. Received {args.Length}", annotation);
+            
+            if (!ulong.TryParse(args[0].Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out _))
+                throw new UnhandledAnnotationException($"Address annotation argument must be a valid hexadecimal number. Received {args[0]}", annotation);
         }
 
-        public object? Handle(RawAnnotation annotation)
+        public override ProcessedAnnotation Handle(RawAnnotation annotation)
         {
-            var args = annotation.Arguments.ToArray();
-            if (!ulong.TryParse(args[0].Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out var address))
-                throw new ArgumentException($"Address annotation argument must be a valid hexadecimal number. Received {args[0]}");
-            if (annotation.Target.IsMethod && annotation.Target.Method is not null)
+            string[] args = [.. annotation.Arguments];
+            if (annotation.Target is ASTVariable variable)
             {
-                return new MethodSymbolJSONModel
-                {
-                    Name = annotation.Target.Method.MangledName,
-                    Address = $"0x{address:X}"
-                };
+                return new ProcessedAnnotation(
+                    annotation,
+                    new VariableSymbolJSONModel
+                    {
+                        Name = variable.MangledName,
+                        Address = args[0]
+                    }
+                );
             }
-            else if (annotation.Target.IsVariable && annotation.Target.Variable is not null)
+            else if (annotation.Target is ASTMethod method)
             {
-                return new VariableSymbolJSONModel
-                {
-                    Name = annotation.Target.Variable.MangledName,
-                    Address = $"0x{address:X}"
-                };
+                return new ProcessedAnnotation(
+                    annotation,
+                    new MethodSymbolJSONModel
+                    {
+                        Name = method.MangledName,
+                        Address = args[0]
+                    }
+                );
             }
-            return null; // This should never be reached due to CanApply checks
+            throw new UnhandledAnnotationException("THIS SHOULDN'T BE HAPPENING", annotation);
         }
     }
 }

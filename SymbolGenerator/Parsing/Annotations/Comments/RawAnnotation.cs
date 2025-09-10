@@ -1,8 +1,8 @@
-﻿namespace Amethyst.SymbolGenerator.Parsing.Annotations
+﻿namespace Amethyst.SymbolGenerator.Parsing.Annotations.Comments
 {
     public record RawAnnotation(string Tag, IEnumerable<string> Arguments, ASTCursorLocation Location)
     {
-        public IAnnotationTarget Target { get; set; } = null!;
+        public AbstractAnnotationTarget Target { get; set; } = null!;
 
         public override string ToString()
         {
