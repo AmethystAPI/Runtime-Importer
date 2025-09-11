@@ -16,7 +16,7 @@ namespace Amethyst.SymbolGenerator
             string name = Assembly.GetEntryAssembly()?.GetName()?.Name ?? "Amethyst.SymbolGenerator";
             Logger.Info($"Starting '{name}' v{shortVersion}...");
             Logger.Info($"Created by ryd3v for Amethyst.");
-            Logger.Info($"Repository: 'https://github.com/AmethystAPI/Symbol-Generator'.");
+            Logger.Info($"Repository: 'https://github.com/AmethystAPI/Runtime-Importer'.");
 
             try
             {

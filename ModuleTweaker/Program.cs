@@ -2,7 +2,7 @@
 using CliFx;
 using System.Reflection;
 
-namespace ModuleTweaker
+namespace Amethyst.ModuleTweaker
 {
     internal class Program
     {
@@ -13,7 +13,7 @@ namespace ModuleTweaker
             string name = Assembly.GetEntryAssembly()?.GetName()?.Name ?? "Amethyst.ModuleTweaker";
             Logger.Info($"Starting '{name}' v{shortVersion}...");
             Logger.Info($"Created by ryd3v for Amethyst.");
-            Logger.Info($"Repository: 'https://github.com/AmethystAPI/Symbol-Generator'.");
+            Logger.Info($"Repository: 'https://github.com/AmethystAPI/Runtime-Importer'.");
 
             return await new CliApplicationBuilder()
                 .AddCommandsFromThisAssembly()
