@@ -201,7 +201,6 @@ namespace Amethyst.SymbolGenerator.Commands
 
             // Save updated checksums only if all operations succeeded
             headerTracker.SaveChecksums(checksums);
-            Logger.Info("Symbols generated succesfully.");
             return default;
         }
     }

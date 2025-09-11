@@ -216,8 +216,7 @@ namespace Amethyst.ModuleTweaker.Patching
 
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
-                Logger.Info($"Created string table section ({StringTableName}).");
-                Logger.Info($"Added {index} strings to string table.");
+                Logger.Info($"Added {index} strings to the string table.");
             }
 
             // Create function descriptor table section
@@ -262,7 +261,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // byte: UsesSignature
                     // ulong: SignatureIndex or Address
                     count++;
-                    Logger.Info($"Added runtime import for function: " + function.Name);
+                    Logger.Info($"Added function: " + function.Name);
                 }
 
                 // Go back and write the count
@@ -271,8 +270,6 @@ namespace Amethyst.ModuleTweaker.Patching
 
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
-                Logger.Info($"Created function descriptor table section ({FunctionDescriptorSectionName}).");
-                Logger.Info($"Added {count} function descriptors to function descriptor table.");
             }
 
             // Create variable descriptor table section
@@ -312,7 +309,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // uint: IATIndex
                     // ulong: Address
                     count++;
-                    Logger.Info($"Added runtime import for variable: " + variable.Name);
+                    Logger.Info($"Added variable: " + variable.Name);
                 }
 
                 // Go back and write the count
@@ -321,8 +318,6 @@ namespace Amethyst.ModuleTweaker.Patching
 
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
-                Logger.Info($"Created variable descriptor table section ({VariableDescriptorSectionName}).");
-                Logger.Info($"Added {count} variable descriptors to variable descriptor table.");
             }
 
             // Create virtual table descriptor table section
@@ -355,7 +350,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // uint: NameIndex
                     // ulong: Address
                     count++;
-                    Logger.Info($"Added virtual table name: " + vtable.Name);
+                    Logger.Info($"Added virtual table: " + vtable.Name);
                 }
 
                 // Go back and write the count
@@ -364,8 +359,6 @@ namespace Amethyst.ModuleTweaker.Patching
 
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
-                Logger.Info($"Created virtual table descriptor table section ({VirtualTableDescriptorSectionName}).");
-                Logger.Info($"Added {count} virtual tables to virtual table descriptor table.");
             }
 
             // Create virtual function descriptor table section
@@ -399,7 +392,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // uint: VirtualTableNameIndex
                     // uint: FunctionIndex
                     count++;
-                    Logger.Info($"Added runtime import for virtual function: " + vfunc.Name);
+                    Logger.Info($"Added virtual function: " + vfunc.Name);
                 }
 
                 // Go back and write the count
@@ -408,8 +401,6 @@ namespace Amethyst.ModuleTweaker.Patching
 
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
-                Logger.Info($"Created virtual function descriptor table section ({VirtualFunctionDescriptorSectionName}).");
-                Logger.Info($"Added {count} virtual function descriptors to virtual function descriptor table.");
             }
 
             // Create new import descriptor table section
@@ -442,8 +433,9 @@ namespace Amethyst.ModuleTweaker.Patching
                 File.OptionalHeader.SetDataDirectory(
                     DataDirectoryIndex.ImportDirectory,
                     new(section.Rva + sizeof(uint) * 2, (uint)ms.Length));
-                Logger.Info("Killed import from 'Minecraft.Windows.exe', patched module for runtime importing.");
+                Logger.Info("Removed import from 'Minecraft.Windows.exe'.");
             }
+            Logger.Info("Patching completed.");
             return true;
         }
 

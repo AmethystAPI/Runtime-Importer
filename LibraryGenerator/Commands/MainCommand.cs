@@ -26,7 +26,7 @@ namespace Amethyst.LibraryGenerator.Commands
 
             if (Input.Exists is false)
             {
-                Logger.Warn("Couldn't generate lib, input directory does not exist.");
+                Logger.Warn("Couldn't generate library, input directory does not exist.");
                 return default;
             }
 
@@ -106,12 +106,12 @@ namespace Amethyst.LibraryGenerator.Commands
             libProc.WaitForExit();
             if (libProc.ExitCode != 0)
             {
-                return ValueTask.FromException(new Exception("Lib generation aborted due to errors."));
+                return ValueTask.FromException(new Exception("Library generation aborted due to errors."));
             }
 
             // Save updated checksums only if all operations succeeded
             symbolTracker.SaveChecksums(checksums);
-            Logger.Info("Lib 'Minecraft.Windows.lib' generated succesfully.");
+            Logger.Info("Library 'Minecraft.Windows.lib' generated succesfully.");
             return default;
         }
     }
