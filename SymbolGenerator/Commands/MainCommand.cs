@@ -177,10 +177,10 @@ namespace Amethyst.SymbolGenerator.Commands
                     string json = JsonConvert.SerializeObject(new SymbolJSONModel
                     {
                         FormatVersion = 1,
-                        Functions = [.. data.OfType<MethodSymbolJSONModel>()],
-                        Variables = [.. data.OfType<VariableSymbolJSONModel>()],
-                        VirtualTables = [.. data.OfType<VirtualTableSymbolJSONModel>()],
-                        VirtualFunctions = [.. data.OfType<VirtualIndexSymbolJSONModel>()],
+                        Functions = [.. data.OfType<FunctionSymbolModel>()],
+                        Variables = [.. data.OfType<VariableSymbolModel>()],
+                        VirtualTables = [.. data.OfType<VirtualTableSymbolModel>().DistinctBy(k => k.Name)],
+                        VirtualFunctions = [.. data.OfType<VirtualFunctionSymbolModel>()],
                     }, Formatting.Indented, jsonSettings);
                     File.WriteAllText(outputFilePath, json);
                     Logger.Info($"Generated: {outputFilePath}");

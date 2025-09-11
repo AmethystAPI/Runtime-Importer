@@ -8,15 +8,15 @@ namespace Amethyst.Common.Models
         public int FormatVersion { get; set; } = 1;
 
         [JsonProperty("functions")]
-        public List<MethodSymbolJSONModel> Functions { get; set; } = [];
+        public List<FunctionSymbolModel> Functions { get; set; } = [];
 
         [JsonProperty("variables")]
-        public List<VariableSymbolJSONModel> Variables { get; set; } = [];
+        public List<VariableSymbolModel> Variables { get; set; } = [];
 
         [JsonProperty("vtables")]
-        public List<VirtualTableSymbolJSONModel> VirtualTables { get; set; } = [];
+        public List<VirtualTableSymbolModel> VirtualTables { get; set; } = [];
 
         [JsonProperty("virtual_functions")]
-        public List<VirtualIndexSymbolJSONModel> VirtualFunctions { get; set; } = [];
+        public List<VirtualFunctionSymbolModel> VirtualFunctions { get; set; } = [];
     }
 }

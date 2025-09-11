@@ -41,7 +41,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
             {
                 return new ProcessedAnnotation(
                     annotation,
-                    new VariableSymbolJSONModel
+                    new VariableSymbolModel
                     {
                         Name = variable.MangledName,
                         Address = args[0]
@@ -52,7 +52,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
             {
                 return new ProcessedAnnotation(
                     annotation,
-                    new MethodSymbolJSONModel
+                    new FunctionSymbolModel
                     {
                         Name = method.MangledName,
                         Address = args[0]

@@ -2,7 +2,7 @@
 
 namespace Amethyst.Common.Models
 {
-    public class MethodSymbolJSONModel
+    public class FunctionSymbolModel
     {
         [JsonProperty("name")]
         public string Name { get; set; } = string.Empty;

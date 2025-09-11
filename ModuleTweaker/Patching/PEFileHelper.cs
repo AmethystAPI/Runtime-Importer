@@ -16,19 +16,20 @@ namespace Amethyst.ModuleTweaker.Patching
 {
     public class PEFileHelper(PEFile file)
     {
-        public const string RuntimeImportVariableDescriptorTableName = ".rivdt";
-        public const string RuntimeImportFunctionDescriptorTableName = ".rifdt";
-        public const string RuntimeImportMangleTableName = ".rimt";
-        public const string RuntimeImportSignatureTableName = ".rist";
-        public const string NewImportDescriptorTableName = ".idnew";
-        public static HashSet<string> SectionNames = new()
-        {
-            RuntimeImportVariableDescriptorTableName,
-            RuntimeImportFunctionDescriptorTableName,
-            RuntimeImportMangleTableName,
-            RuntimeImportSignatureTableName,
-            NewImportDescriptorTableName
-        };
+        public const string StringTableName = ".strt";
+        public const string FunctionDescriptorSectionName = ".fndt";
+        public const string VirtualFunctionDescriptorSectionName = ".vfndt";
+        public const string VariableDescriptorSectionName = ".vardt";
+        public const string VirtualTableDescriptorSectionName = ".vtbdt";
+        public const string NewImportDescriptorSectionName = ".idnew";
+        public static HashSet<string> SectionNames = [
+            VariableDescriptorSectionName,
+            FunctionDescriptorSectionName,
+            StringTableName,
+            VirtualFunctionDescriptorSectionName,
+            VirtualTableDescriptorSectionName,
+            NewImportDescriptorSectionName
+        ];
 
         public PEFile File { get; private set; } = file;
 
@@ -57,16 +58,18 @@ namespace Amethyst.ModuleTweaker.Patching
             for (int i = File.Sections.Count - 1; i >= 0; i--)
             {
                 var section = File.Sections[i];
-                if (section.Name == NewImportDescriptorTableName)
+                if (section.Name == NewImportDescriptorSectionName)
                 {
-                    var reader = section.CreateReader();
+                    BinaryStreamReader reader = section.CreateReader();
                     uint originalIDTRva = reader.ReadUInt32();
                     uint originalIDTSize = reader.ReadUInt32();
 
                     File.OptionalHeader.SetDataDirectory(
                         DataDirectoryIndex.ImportDirectory,
-                        new(originalIDTRva, originalIDTSize));
+                        new(originalIDTRva, originalIDTSize)
+                    );
                 }
+
                 if (IsCustomSectionName(section.Name))
                 {
                     Logger.Info($"Removing custom section '{section.Name}'...");
@@ -76,7 +79,11 @@ namespace Amethyst.ModuleTweaker.Patching
             File.AlignSections();
         }
 
-        public bool Patch(IEnumerable<MethodSymbolJSONModel> methodSymbols, IEnumerable<VariableSymbolJSONModel> variableSymbols)
+        public bool Patch(
+            IEnumerable<FunctionSymbolModel> functions, 
+            IEnumerable<VariableSymbolModel> variables, 
+            IEnumerable<VirtualTableSymbolModel> vtables,
+            IEnumerable<VirtualFunctionSymbolModel> vfunctions)
         {
             if (IsPatched())
             {
@@ -130,7 +137,7 @@ namespace Amethyst.ModuleTweaker.Patching
             // Map all mangled names for "Minecraft.Windows.exe" functions to IAT offsets
             uint iatRva = minecraftWindowsImportDescriptor.Value.FirstThunk;
             uint iatSize = 0;
-            Dictionary<string, uint> nameToIatIndex = [];
+            Dictionary<string, uint> iatIndices = [];
             {
                 var reader = File.CreateReaderAtRva(minecraftWindowsImportDescriptor.Value.OriginalFirstThunk);
                 uint iatIndex = 0;
@@ -148,20 +155,17 @@ namespace Amethyst.ModuleTweaker.Patching
                     var hintNameReader = File.CreateReaderAtRva(hintNameRva);
                     ushort hint = hintNameReader.ReadUInt16();
                     string functionName = hintNameReader.ReadAsciiString();
-                    nameToIatIndex[functionName] = iatIndex - 1;
+                    iatIndices[functionName] = iatIndex - 1;
                 }
                 iatSize = iatIndex;
             }
 
-            MethodSymbolJSONModel[] methods = [.. methodSymbols];
-            VariableSymbolJSONModel[] variables = [.. variableSymbols];
-
-            // Create mangle table section
-            // Contains all mangled names of functions to be resolved at runtime
-            Dictionary<string, uint> nameToIndex = [];
+            Dictionary<string, uint> stringToIndex = [];
             {
+                // Create string table section
+                // Contains all strings (eg. mangled names, signatures) to be resolved at runtime
                 PESection section = new(
-                    RuntimeImportMangleTableName, 
+                    StringTableName,
                     SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
 
                 using var ms = new MemoryStream();
@@ -169,47 +173,41 @@ namespace Amethyst.ModuleTweaker.Patching
                 uint countPosition = (uint)ms.Position;
                 writer.WriteUInt32(0u); // Placeholder for count
                 uint index = 0;
-                foreach (var method in methods)
+
+                // Write all function names
+                foreach (var method in functions)
                 {
                     writer.WriteBytes([.. Encoding.ASCII.GetBytes(method.Name), 0]);
-                    nameToIndex[method.Name] = index++;
+                    stringToIndex[method.Name] = index++;
+                    
                 }
 
+                // Write all function signatures
+                foreach (var method in functions.Where(m => m.Signature is not null))
+                {
+                    writer.WriteBytes([.. Encoding.ASCII.GetBytes(method.Signature!), 0]);
+                    stringToIndex[method.Signature!] = index++;
+                }
+
+                // Write all variable names
                 foreach (var variable in variables)
                 {
                     writer.WriteBytes([.. Encoding.ASCII.GetBytes(variable.Name), 0]);
-                    nameToIndex[variable.Name] = index++;
+                    stringToIndex[variable.Name] = index++;
                 }
 
-                // Go back and write the count
-                ms.Seek(countPosition, SeekOrigin.Begin);
-                writer.WriteUInt32((uint)nameToIndex.Count);
-
-                section.Contents = new DataSegment(ms.ToArray());
-                File.Sections.Add(section);
-                Logger.Info($"Created mangle table section ({RuntimeImportMangleTableName}).");
-                Logger.Info($"Added {index} mangled names to mangle table.");
-            }
-
-            // Create signature table section
-            // Contains signatures (eg. DE AD BE EF ? AA ? BB) of all functions to be resolved at runtime
-            Dictionary<string, uint> signatureToIndex = [];
-            {
-                PESection section = new(
-                    RuntimeImportSignatureTableName,
-                    SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
-                using var ms = new MemoryStream();
-                var writer = new BinaryStreamWriter(ms);
-                uint index = 0;
-                uint countPosition = (uint)ms.Position;
-                writer.WriteUInt32(0u); // Placeholder for count
-                for (uint i = 0; i < methods.Length; i++)
+                // Write all virtual table names
+                foreach (var vtable in vtables)
                 {
-                    var method = methods[i];
-                    if (method.Signature is null)
-                        continue;
-                    writer.WriteBytes([.. Encoding.ASCII.GetBytes(method.Signature), 0]);
-                    signatureToIndex[method.Signature] = index++;
+                    writer.WriteBytes([.. Encoding.ASCII.GetBytes(vtable.Name), 0]);
+                    stringToIndex[vtable.Name] = index++;
+                }
+
+                // Write all virtual function names
+                foreach (var vfunc in vfunctions)
+                {
+                    writer.WriteBytes([.. Encoding.ASCII.GetBytes(vfunc.Name), 0]);
+                    stringToIndex[vfunc.Name] = index++;
                 }
 
                 // Go back and write the count
@@ -218,15 +216,15 @@ namespace Amethyst.ModuleTweaker.Patching
 
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
-                Logger.Info($"Created signature table section ({RuntimeImportSignatureTableName}).");
-                Logger.Info($"Added {signatureToIndex.Count} signatures to signature table.");
+                Logger.Info($"Created string table section ({StringTableName}).");
+                Logger.Info($"Added {index} strings to string table.");
             }
 
             // Create function descriptor table section
             // Contains descriptors for all functions to be resolved at runtime
             {
                 PESection section = new(
-                    RuntimeImportFunctionDescriptorTableName,
+                    FunctionDescriptorSectionName,
                     SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
                 using var ms = new MemoryStream();
                 var writer = new BinaryStreamWriter(ms);
@@ -235,17 +233,12 @@ namespace Amethyst.ModuleTweaker.Patching
                 writer.WriteUInt32(iatRva);
                 writer.WriteUInt32(iatSize);
                 uint count = 0;
-                foreach (var method in methods)
+                foreach (var function in functions)
                 {
-                    if (!nameToIatIndex.ContainsKey(method.Name))
-                    {
-                        Logger.Warn($"Skipping method '{method.Name}' as it does not exist in the import table of 'Minecraft.Windows.exe'.");
+                    if (!iatIndices.TryGetValue(function.Name, out uint iatIndex))
                         continue;
-                    }
-
-                    uint nameIndex = nameToIndex[method.Name];
-                    uint iatIndex = nameToIatIndex[method.Name];
-                    bool usesSignature = method.Signature is not null;
+                    uint nameIndex = stringToIndex[function.Name];
+                    bool usesSignature = function.Signature is not null;
 
                     writer.WriteUInt32(nameIndex);
                     writer.WriteUInt32(iatIndex);
@@ -253,12 +246,12 @@ namespace Amethyst.ModuleTweaker.Patching
 
                     if (usesSignature)
                     {
-                        uint signatureIndex = signatureToIndex[method.Signature!];
+                        uint signatureIndex = stringToIndex[function.Signature!];
                         writer.WriteUInt64(signatureIndex);
                     }
                     else
                     {
-                        if (!ulong.TryParse(method.Address?.Replace("0x", "") ?? "0", out ulong address))
+                        if (!ulong.TryParse(function.Address?.Replace("0x", "") ?? "0", out ulong address))
                             writer.WriteUInt64(0x0);
                         else
                             writer.WriteUInt64(address);
@@ -269,7 +262,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // byte: UsesSignature
                     // ulong: SignatureIndex or Address
                     count++;
-                    Logger.Info($"Added runtime import for function: " + method.Name);
+                    Logger.Info($"Added runtime import for function: " + function.Name);
                 }
 
                 // Go back and write the count
@@ -278,7 +271,7 @@ namespace Amethyst.ModuleTweaker.Patching
 
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
-                Logger.Info($"Created function descriptor table section ({RuntimeImportFunctionDescriptorTableName}).");
+                Logger.Info($"Created function descriptor table section ({FunctionDescriptorSectionName}).");
                 Logger.Info($"Added {count} function descriptors to function descriptor table.");
             }
 
@@ -286,7 +279,7 @@ namespace Amethyst.ModuleTweaker.Patching
             // Contains descriptors for all variables to be resolved at runtime
             {
                 PESection section = new(
-                    RuntimeImportVariableDescriptorTableName,
+                    VariableDescriptorSectionName,
                     SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
                 using var ms = new MemoryStream();
                 var writer = new BinaryStreamWriter(ms);
@@ -297,18 +290,14 @@ namespace Amethyst.ModuleTweaker.Patching
                 uint count = 0;
                 foreach (var variable in variables)
                 {
-                    if (!nameToIatIndex.ContainsKey(variable.Name))
-                    {
-                        Logger.Warn($"Skipping variable '{variable.Name}' as it does not exist in the import table of 'Minecraft.Windows.exe'.");
+                    if (!iatIndices.TryGetValue(variable.Name, out uint iatIndex))
                         continue;
-                    }
-
-                    uint nameIndex = nameToIndex[variable.Name];
-                    uint iatIndex = nameToIatIndex[variable.Name];
+                    uint nameIndex = stringToIndex[variable.Name];
 
                     writer.WriteUInt32(nameIndex);
                     writer.WriteUInt32(iatIndex);
                     string address = variable.Address.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? variable.Address[2..] : variable.Address;
+                    
                     try
                     {
                         ulong addressValue = ulong.Parse(address, NumberStyles.HexNumber);
@@ -332,21 +321,110 @@ namespace Amethyst.ModuleTweaker.Patching
 
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
-                Logger.Info($"Created variable descriptor table section ({RuntimeImportVariableDescriptorTableName}).");
+                Logger.Info($"Created variable descriptor table section ({VariableDescriptorSectionName}).");
                 Logger.Info($"Added {count} variable descriptors to variable descriptor table.");
+            }
+
+            // Create virtual table descriptor table section
+            {
+                PESection section = new(
+                    VirtualTableDescriptorSectionName,
+                    SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
+                using var ms = new MemoryStream();
+                var writer = new BinaryStreamWriter(ms);
+                uint countPosition = (uint)ms.Position;
+                writer.WriteUInt32(0u); // Placeholder for count
+                uint count = 0;
+                foreach (var vtable in vtables)
+                {
+                    uint nameIndex = stringToIndex[vtable.Name];
+
+                    writer.WriteUInt32(nameIndex);
+                    string address = vtable.Address.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? vtable.Address[2..] : vtable.Address;
+                    
+                    try
+                    {
+                        ulong addressValue = ulong.Parse(address, NumberStyles.HexNumber);
+                        writer.WriteUInt64(addressValue);
+                    }
+                    catch (Exception)
+                    {
+                        writer.WriteUInt64(0x0);
+                    }
+
+                    // uint: NameIndex
+                    // ulong: Address
+                    count++;
+                    Logger.Info($"Added virtual table name: " + vtable.Name);
+                }
+
+                // Go back and write the count
+                ms.Seek(countPosition, SeekOrigin.Begin);
+                writer.WriteUInt32(count);
+
+                section.Contents = new DataSegment(ms.ToArray());
+                File.Sections.Add(section);
+                Logger.Info($"Created virtual table descriptor table section ({VirtualTableDescriptorSectionName}).");
+                Logger.Info($"Added {count} virtual tables to virtual table descriptor table.");
+            }
+
+            // Create virtual function descriptor table section
+            {
+                PESection section = new(
+                    VirtualFunctionDescriptorSectionName,
+                    SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
+                using var ms = new MemoryStream();
+                var writer = new BinaryStreamWriter(ms);
+                uint countPosition = (uint)ms.Position;
+                writer.WriteUInt32(0u); // Placeholder for count
+                writer.WriteUInt32(iatRva);
+                writer.WriteUInt32(iatSize);
+                uint count = 0;
+                foreach (var vfunc in vfunctions)
+                {
+                    if (!iatIndices.TryGetValue(vfunc.Name, out uint iatIndex))
+                        continue;
+                    if (!stringToIndex.TryGetValue(vfunc.VirtualTable, out uint vtableIndex))
+                        continue;
+
+                    uint nameIndex = stringToIndex[vfunc.Name];
+
+                    writer.WriteUInt32(nameIndex);
+                    writer.WriteUInt32(iatIndex);
+                    writer.WriteUInt32(vtableIndex);
+                    writer.WriteUInt32(vfunc.Index);
+
+                    // uint: NameIndex
+                    // uint: IATIndex
+                    // uint: VirtualTableNameIndex
+                    // uint: FunctionIndex
+                    count++;
+                    Logger.Info($"Added runtime import for virtual function: " + vfunc.Name);
+                }
+
+                // Go back and write the count
+                ms.Seek(countPosition, SeekOrigin.Begin);
+                writer.WriteUInt32(count);
+
+                section.Contents = new DataSegment(ms.ToArray());
+                File.Sections.Add(section);
+                Logger.Info($"Created virtual function descriptor table section ({VirtualFunctionDescriptorSectionName}).");
+                Logger.Info($"Added {count} virtual function descriptors to virtual function descriptor table.");
             }
 
             // Create new import descriptor table section
             // Contains a copy of the original import descriptor table without the "Minecraft.Windows.exe" entry
             {
                 PESection section = new(
-                    NewImportDescriptorTableName,
+                    NewImportDescriptorSectionName,
                     SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
                 using var ms = new MemoryStream();
                 var writer = new BinaryStreamWriter(ms);
+
                 // Write original import directory RVA and size at the start
                 writer.WriteUInt32(importDirectory.VirtualAddress);
                 writer.WriteUInt32(importDirectory.Size);
+
                 foreach (var descriptor in importDescriptors)
                 {
                     if (descriptor.Equals(minecraftWindowsImportDescriptor.Value))

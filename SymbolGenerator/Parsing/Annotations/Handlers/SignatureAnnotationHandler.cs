@@ -32,7 +32,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
             string[] args = [.. annotation.Arguments];
             return new ProcessedAnnotation(
                 annotation,
-                new MethodSymbolJSONModel
+                new FunctionSymbolModel
                 {
                     Name = target.MangledName,
                     Signature = args[0]

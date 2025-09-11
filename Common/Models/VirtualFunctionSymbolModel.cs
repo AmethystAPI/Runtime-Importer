@@ -7,12 +7,12 @@ using System.Threading.Tasks;
 
 namespace Amethyst.Common.Models
 {
-    public class VirtualIndexSymbolJSONModel
+    public class VirtualFunctionSymbolModel
     {
         [JsonProperty("name")]
         public string Name { get; set; } = string.Empty;
 
-        [JsonProperty("vftable")]
+        [JsonProperty("vtable")]
         public string VirtualTable { get; set; } = string.Empty;
 
         [JsonIgnore]

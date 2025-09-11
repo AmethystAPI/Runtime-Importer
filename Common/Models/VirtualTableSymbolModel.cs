@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Amethyst.Common.Models
 {
-    public class VirtualTableSymbolJSONModel
+    public class VirtualTableSymbolModel
     {
         [JsonProperty("name")]
         public string Name { get; set; } = string.Empty;

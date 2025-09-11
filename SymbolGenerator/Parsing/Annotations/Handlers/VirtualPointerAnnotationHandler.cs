@@ -32,7 +32,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
             string[] args = [.. annotation.Arguments];
             return new ProcessedAnnotation(
                 annotation,
-                new VirtualTableSymbolJSONModel
+                new VirtualTableSymbolModel
                 {
                     Name = $"{target.FullName}::vtable::'{args[1]}'",
                     Address = args[0]

@@ -36,8 +36,10 @@ namespace Amethyst.ModuleTweaker.Commands
 
             // Collect all symbol files and accumulate mangled names
             IEnumerable<FileInfo> symbolFiles = symbols.EnumerateFiles("*.json", SearchOption.AllDirectories);
-            HashSet<MethodSymbolJSONModel> methods = [];
-            HashSet<VariableSymbolJSONModel> variables = [];
+            HashSet<FunctionSymbolModel> methods = [];
+            HashSet<VariableSymbolModel> variables = [];
+            HashSet<VirtualTableSymbolModel> vtables = [];
+            HashSet<VirtualFunctionSymbolModel> vfuncs = [];
             foreach (var symbolFile in symbolFiles)
             {
                 using var stream = symbolFile.OpenRead();
@@ -60,6 +62,18 @@ namespace Amethyst.ModuleTweaker.Commands
                                     continue;
                                 variables.Add(variable);
                             }
+                            foreach (var vtable in symbolJson.VirtualTables)
+                            {
+                                if (string.IsNullOrEmpty(vtable.Name))
+                                    continue;
+                                vtables.Add(vtable);
+                            }
+                            foreach (var vfunc in symbolJson.VirtualFunctions)
+                            {
+                                if (string.IsNullOrEmpty(vfunc.Name))
+                                    continue;
+                                vfuncs.Add(vfunc);
+                            }
                             break;
                     }
                 }
@@ -70,7 +84,7 @@ namespace Amethyst.ModuleTweaker.Commands
                 // Patch the module
                 var file = PEFile.FromFile(ModulePath);
                 PEFileHelper helper = new(file);
-                if (helper.Patch(methods, variables))
+                if (helper.Patch(methods, variables, vtables, vfuncs))
                 {
                     file.AlignSections();
                     File.Copy(ModulePath, ModulePath + ".backup", true);

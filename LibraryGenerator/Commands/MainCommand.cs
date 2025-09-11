@@ -81,6 +81,14 @@ namespace Amethyst.LibraryGenerator.Commands
                                 Logger.Info("Adding symbol: " + variable.Name);
                                 allMangledNames.Add(variable.Name);
                             }
+
+                            foreach (var vfunc in symbolJson.VirtualFunctions)
+                            {
+                                if (string.IsNullOrEmpty(vfunc.Name))
+                                    continue;
+                                Logger.Info("Adding symbol: " + vfunc.Name);
+                                allMangledNames.Add(vfunc.Name);
+                            }
                             break;
                     }
                 }

@@ -133,8 +133,18 @@ namespace Amethyst.SymbolGenerator.Parsing
                     return "Unknown";
             }
 
-            string mangled = cursor.Mangling.ToString();
+            string? mangled = null;
+            unsafe
+            {
+                if (cursor.CXXManglings is not null)
+                    mangled = cursor.CXXManglings->FirstOrDefault().ToString();
+                else 
+                    mangled = cursor.Mangling.ToString();
+            }
             
+            if (string.IsNullOrEmpty(mangled))
+                mangled = "Unknown";
+
             MangleCache[usr] = mangled;
             return mangled;
         }
