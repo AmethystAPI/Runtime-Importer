@@ -11,6 +11,7 @@ namespace Amethyst.SymbolGenerator.Parsing
         public override ASTCursorLocation? Location { get; set; } = null;
         public bool IsVirtual { get; set; } = false;
         public bool IsImported { get; set; } = false;
+        public bool IsConstructor { get; set; } = false;
         public bool IsDestructor { get; set; } = false;
         public string? RawComment { get; set; } = null;
         public ASTMethod? OverrideOf { get; set; }

@@ -460,6 +460,7 @@ namespace Amethyst.SymbolGenerator.Parsing
                 IsImported = IsImported(cursor),
                 Namespace = parent.Kind == CXCursorKind.CXCursor_Namespace ? GetFullNamespace(parent) : null,
                 IsDestructor = cursor.Kind == CXCursorKind.CXCursor_Destructor,
+                IsConstructor = cursor.Kind == CXCursorKind.CXCursor_Constructor,
                 OverrideOf = overrideOf
             };
 

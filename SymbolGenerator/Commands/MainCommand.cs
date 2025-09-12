@@ -1,14 +1,15 @@
 ﻿using Amethyst.Common.Diagnostics;
+using Amethyst.Common.Models;
+using Amethyst.Common.Tracking;
+using Amethyst.Common.Utility;
 using Amethyst.SymbolGenerator.Parsing;
+using Amethyst.SymbolGenerator.Parsing.Annotations;
+using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
 using CliFx;
 using CliFx.Attributes;
 using CliFx.Infrastructure;
-using Amethyst.Common.Tracking;
-using Amethyst.Common.Utility;
-using Amethyst.SymbolGenerator.Parsing.Annotations;
 using Newtonsoft.Json;
-using Amethyst.Common.Models;
-using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
+using System.IO;
 
 namespace Amethyst.SymbolGenerator.Commands
 {
@@ -161,6 +162,18 @@ namespace Amethyst.SymbolGenerator.Commands
                         if (!annotationsData.ContainsKey(location.File))
                             annotationsData[location.File] = [];
                         annotationsData[location.File].Add(processed.Data);
+
+                        // Create helper symbol $vtable_for_X$ for virtual tables
+                        if (processed.Data is VirtualTableSymbolModel vtable && processed.Target is ASTClass cls)
+                        {
+                            var classMangle = string.Join("@", cls.FullName.Split("::").Reverse());
+                            string mangled = $"?$vtable_for_{vtable.ForWhat.Replace("::", "$")}$@{classMangle}@@2_KA";
+                            annotationsData[location.File].Add(new VariableSymbolModel
+                            {
+                                Name = mangled,
+                                Address = vtable.Address
+                            });
+                        }
                     }
                 });
             }

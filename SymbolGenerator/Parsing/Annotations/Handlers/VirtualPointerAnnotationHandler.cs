@@ -35,7 +35,8 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
                 new VirtualTableSymbolModel
                 {
                     Name = $"{target.FullName}::vtable::'{args[1]}'",
-                    Address = args[0]
+                    Address = args[0],
+                    ForWhat = args[1]
                 }
             );
         }
