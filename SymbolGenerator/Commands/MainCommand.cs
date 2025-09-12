@@ -167,7 +167,7 @@ namespace Amethyst.SymbolGenerator.Commands
                         if (processed.Data is VirtualTableSymbolModel vtable && processed.Target is ASTClass cls)
                         {
                             var classMangle = string.Join("@", cls.FullName.Split("::").Reverse());
-                            string mangled = $"?$vtable_for_{vtable.ForWhat.Replace("::", "$")}$@{classMangle}@@2_KA";
+                            string mangled = $"?$vtable_for_{vtable.ForWhat.Replace("::", "$")}@{classMangle}@@2_KA";
                             annotationsData[location.File].Add(new VariableSymbolModel
                             {
                                 Name = mangled,
