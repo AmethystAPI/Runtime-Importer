@@ -259,6 +259,11 @@ namespace Amethyst.SymbolGenerator.Parsing
                 // Traverse the AST
                 TranslationUnit.Cursor.VisitChildren((cursor, parent, data) =>
                 {
+                    if (cursor.Kind == CXCursorKind.CXCursor_Namespace)
+                    {
+                        return CXChildVisitResult.CXChildVisit_Recurse;
+                    }
+
                     var loc = GetLocation(cursor);
                     if (loc is null || !ShouldProcessFile(loc.File))
                         return CXChildVisitResult.CXChildVisit_Continue;
@@ -301,6 +306,11 @@ namespace Amethyst.SymbolGenerator.Parsing
                 // Traverse the AST
                 TranslationUnit.Cursor.VisitChildren((cursor, parent, data) =>
                 {
+                    if (cursor.Kind == CXCursorKind.CXCursor_Namespace)
+                    {
+                        return CXChildVisitResult.CXChildVisit_Recurse;
+                    }
+
                     var loc = GetLocation(cursor);
                     if (loc is null || !ShouldProcessFile(loc.File))
                         return CXChildVisitResult.CXChildVisit_Continue;
@@ -336,6 +346,11 @@ namespace Amethyst.SymbolGenerator.Parsing
                 // Traverse the AST
                 TranslationUnit.Cursor.VisitChildren((cursor, parent, data) =>
                 {
+                    if (cursor.Kind == CXCursorKind.CXCursor_Namespace)
+                    {
+                        return CXChildVisitResult.CXChildVisit_Recurse;
+                    }
+
                     var loc = GetLocation(cursor);
                     if (loc is null || !ShouldProcessFile(loc.File))
                         return CXChildVisitResult.CXChildVisit_Continue;
