@@ -11,11 +11,15 @@ namespace Amethyst.Common.Diagnostics
             Console.ResetColor();
         }
 
-        public static void Info(object? message) => 
+        public static void Info(object? message)
+        {
+#if DEBUG
             WriteLine($"{(
-                Assembly.GetEntryAssembly()?.GetName()?.Name is { } name ? 
+                Assembly.GetEntryAssembly()?.GetName()?.Name is { } name ?
                 $"[{name}] " :
                 "")}[INFO] {message}", ConsoleColor.White);
+#endif
+        }
 
         public static void Warn(string message) =>
             WriteLine($"{(

@@ -11,6 +11,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Amethyst.ModuleTweaker.Patching
 {
@@ -216,7 +217,7 @@ namespace Amethyst.ModuleTweaker.Patching
 
                 section.Contents = new DataSegment(ms.ToArray());
                 File.Sections.Add(section);
-                Logger.Info($"Added {index} strings to the string table.");
+                Logger.Info($"Added {index} strings.");
             }
 
             // Create function descriptor table section
@@ -261,7 +262,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // byte: UsesSignature
                     // ulong: SignatureIndex or Address
                     count++;
-                    Logger.Info($"Added function: " + function.Name);
+                    Logger.WriteLine(function.Name);
                 }
 
                 // Go back and write the count
@@ -309,7 +310,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // uint: IATIndex
                     // ulong: Address
                     count++;
-                    Logger.Info($"Added variable: " + variable.Name);
+                    Logger.WriteLine(variable.Name);
                 }
 
                 // Go back and write the count
@@ -350,7 +351,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // uint: NameIndex
                     // ulong: Address
                     count++;
-                    Logger.Info($"Added virtual table: " + vtable.Name);
+                    Logger.WriteLine(vtable.Name);
                 }
 
                 // Go back and write the count
@@ -392,7 +393,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // uint: VirtualTableNameIndex
                     // uint: FunctionIndex
                     count++;
-                    Logger.Info($"Added virtual function: " + vfunc.Name);
+                    Logger.WriteLine(vfunc.Name);
                 }
 
                 // Go back and write the count

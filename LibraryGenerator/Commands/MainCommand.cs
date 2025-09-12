@@ -70,7 +70,7 @@ namespace Amethyst.LibraryGenerator.Commands
                             {
                                 if (string.IsNullOrEmpty(function.Name))
                                     continue;
-                                Logger.Info("Adding symbol: " + function.Name);
+                                Logger.WriteLine(function.Name);
                                 allMangledNames.Add(function.Name);
                             }
 
@@ -78,7 +78,7 @@ namespace Amethyst.LibraryGenerator.Commands
                             {
                                 if (string.IsNullOrEmpty(variable.Name))
                                     continue;
-                                Logger.Info("Adding symbol: " + variable.Name);
+                                Logger.WriteLine(variable.Name);
                                 allMangledNames.Add(variable.Name);
                             }
 
@@ -86,7 +86,7 @@ namespace Amethyst.LibraryGenerator.Commands
                             {
                                 if (string.IsNullOrEmpty(vfunc.Name))
                                     continue;
-                                Logger.Info("Adding symbol: " + vfunc.Name);
+                                Logger.WriteLine(vfunc.Name);
                                 allMangledNames.Add(vfunc.Name);
                             }
                             break;

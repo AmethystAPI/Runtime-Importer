@@ -26,8 +26,8 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
                 throw new UnhandledAnnotationException($"Multiple virtual index, address or signature annotations applied to the same target {annotation.Target}.", annotation);
 
             string[] args = [.. annotation.Arguments];
-            if (args.Length != 2)
-                throw new UnhandledAnnotationException($"Virtual index annotation requires exactly two arguments. Received {args.Length}", annotation);
+            if (args.Length < 1 || args.Length >= 3)
+                throw new UnhandledAnnotationException($"Virtual index annotation requires one or two arguments. Received {args.Length}", annotation);
 
             bool inherit = args[0] == "inherit";
             if (inherit && method.OverrideOf is null)
@@ -42,13 +42,14 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
             ASTMethod target = (annotation.Target as ASTMethod)!;
             string[] args = [.. annotation.Arguments];
             bool inherit = args[0] == "inherit";
+            string vtableName = args.Length > 1 ? args[1] : "this";
             return new ProcessedAnnotation(
                 annotation,
                 new VirtualFunctionSymbolModel
                 {
                     Name = target.MangledName,
                     Index = inherit ? 0 : uint.Parse(args[0]),
-                    VirtualTable = $"{target.DeclaringClass!.FullName}::vtable::'{args[1]}'",
+                    VirtualTable = $"{target.DeclaringClass!.FullName}::vtable::'{vtableName}'",
                     Inherit = inherit,
                     Overrides = inherit ? target.OverrideOf!.MangledName : null
                 },
