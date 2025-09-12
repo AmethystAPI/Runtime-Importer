@@ -14,5 +14,8 @@ namespace Amethyst.Common.Models
 
         [JsonProperty("address")]
         public string Address { get; set; } = string.Empty;
+
+        [JsonIgnore]
+        public string ForWhat { get; set; } = string.Empty;
     }
 }

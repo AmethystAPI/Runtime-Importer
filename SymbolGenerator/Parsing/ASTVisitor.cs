@@ -82,9 +82,14 @@ namespace Amethyst.SymbolGenerator.Parsing
         }
         #endregion
 
+        public string GetUsr(CXCursor cursor)
+        {
+            return cursor.Usr.ToString() + cursor.IsDefinition;
+        }
+
         public string GetSpelling(CXCursor cursor)
         {
-            string usr = cursor.Usr.ToString();
+            string usr = GetUsr(cursor);
             if (SpellingCache.TryGetValue(usr, out var cached))
                 return cached;
 
@@ -96,7 +101,7 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public ASTCursorLocation? GetLocation(CXCursor cursor)
         {
-            string usr = cursor.Usr.ToString();
+            string usr = GetUsr(cursor);
             if (LocationCache.TryGetValue(usr, out var cached))
                 return cached;
 
@@ -117,7 +122,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             if (cursor.IsNull || cursor.IsInvalid)
                 return "Unknown";
 
-            string usr = cursor.Usr.ToString();
+            string usr = GetUsr(cursor);
             if (MangleCache.TryGetValue(usr, out var cached))
                 return cached;
 
@@ -151,7 +156,7 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public string? GetRawComment(CXCursor cursor)
         {
-            string usr = cursor.Usr.ToString();
+            string usr = GetUsr(cursor);
 
             if (RawCommentCache.TryGetValue(usr, out var cached))
                 return cached;
@@ -166,7 +171,7 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public bool IsImported(CXCursor cursor)
         {
-            string usr = cursor.Usr.ToString();
+            string usr = GetUsr(cursor);
             if (IsImportedCache.TryGetValue(usr, out var cached))
                 return cached;
 
@@ -192,7 +197,7 @@ namespace Amethyst.SymbolGenerator.Parsing
         {
             if (cursor.Kind != CXCursorKind.CXCursor_Namespace)
                 return null;
-            string usr = cursor.Usr.ToString();
+            string usr = GetUsr(cursor);
             if (FullNamespaceCache.TryGetValue(usr, out var cached))
                 return cached;
 
@@ -271,7 +276,12 @@ namespace Amethyst.SymbolGenerator.Parsing
                     // Get class/struct declarations
                     if (cursor.Kind == CXCursorKind.CXCursor_ClassDecl || cursor.Kind == CXCursorKind.CXCursor_StructDecl)
                     {
-                        var usr = cursor.Usr.ToString();
+                        if (!cursor.IsDefinition)
+                            cursor = cursor.Definition;
+                        if (!cursor.IsDefinition)
+                            return CXChildVisitResult.CXChildVisit_Continue;
+
+                        var usr = GetUsr(cursor);
                         if (ClassCache.TryGetValue(usr, out var cached))
                         {
                             classes.Add(cached);
@@ -318,7 +328,7 @@ namespace Amethyst.SymbolGenerator.Parsing
                     // Get methods/free functions
                     if (cursor.Kind == CXCursorKind.CXCursor_FunctionDecl)
                     {
-                        var usr = cursor.Usr.ToString();
+                        var usr = GetUsr(cursor);
                         if (MethodCache.TryGetValue(usr, out var cached))
                         {
                             methods.Add(cached);
@@ -332,6 +342,13 @@ namespace Amethyst.SymbolGenerator.Parsing
                             return result;
                         }
                     }
+
+                    // Recurse into namespaces
+                    if (cursor.Kind == CXCursorKind.CXCursor_Namespace)
+                    {
+                        return CXChildVisitResult.CXChildVisit_Recurse;
+                    }
+
                     return CXChildVisitResult.CXChildVisit_Continue;
                 }, new CXClientData(nint.Zero));
             }
@@ -358,7 +375,7 @@ namespace Amethyst.SymbolGenerator.Parsing
                     // Get variable declarations
                     if (cursor.Kind == CXCursorKind.CXCursor_VarDecl)
                     {
-                        var usr = cursor.Usr.ToString();
+                        var usr = GetUsr(cursor);
                         if (VariableCache.TryGetValue(usr, out var cached))
                         {
                             variables.Add(cached);
@@ -375,6 +392,13 @@ namespace Amethyst.SymbolGenerator.Parsing
                             return result;
                         }
                     }
+
+                    // Recurse into namespaces
+                    if (cursor.Kind == CXCursorKind.CXCursor_Namespace)
+                    {
+                        return CXChildVisitResult.CXChildVisit_Recurse;
+                    }
+
                     return CXChildVisitResult.CXChildVisit_Continue;
                 }, new CXClientData(nint.Zero));
             }
@@ -465,6 +489,7 @@ namespace Amethyst.SymbolGenerator.Parsing
                 IsImported = IsImported(cursor),
                 Namespace = parent.Kind == CXCursorKind.CXCursor_Namespace ? GetFullNamespace(parent) : null,
                 IsDestructor = cursor.Kind == CXCursorKind.CXCursor_Destructor,
+                IsConstructor = cursor.Kind == CXCursorKind.CXCursor_Constructor,
                 OverrideOf = overrideOf
             };
 

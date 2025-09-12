@@ -14,7 +14,7 @@ namespace Amethyst.Common.Utility
             var sw = Stopwatch.StartNew();
             T res = action();
             sw.Stop();
-            Logger.Info($"[Benchmark] {name} took {sw.Elapsed.TotalMilliseconds:F0} ms");
+            Logger.Debug($"[Benchmark] {name} took {sw.Elapsed.TotalMilliseconds:F0} ms");
             return res;
         }
 
@@ -23,7 +23,7 @@ namespace Amethyst.Common.Utility
             var sw = Stopwatch.StartNew();
             action();
             sw.Stop();
-            Logger.Info($"[Benchmark] {name} took {sw.Elapsed.TotalMilliseconds:F0} ms");
+            Logger.Debug($"[Benchmark] {name} took {sw.Elapsed.TotalMilliseconds:F0} ms");
         }
 
         [GeneratedRegex(@"^\s*///\s*@\s*symbolgeneration\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase)]

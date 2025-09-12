@@ -49,7 +49,7 @@ namespace Amethyst.LibraryGenerator.Commands
 
             if (!hadChanges)
             {
-                Logger.Info("No '*.symbols.json' changes detected, no lib to generate.");
+                Logger.Debug("No '*.symbols.json' changes detected, no lib to generate.");
                 return default;
             }
 
@@ -70,7 +70,6 @@ namespace Amethyst.LibraryGenerator.Commands
                             {
                                 if (string.IsNullOrEmpty(function.Name))
                                     continue;
-                                Logger.Info("Adding symbol: " + function.Name);
                                 allMangledNames.Add(function.Name);
                             }
 
@@ -78,7 +77,6 @@ namespace Amethyst.LibraryGenerator.Commands
                             {
                                 if (string.IsNullOrEmpty(variable.Name))
                                     continue;
-                                Logger.Info("Adding symbol: " + variable.Name);
                                 allMangledNames.Add(variable.Name);
                             }
 
@@ -86,7 +84,6 @@ namespace Amethyst.LibraryGenerator.Commands
                             {
                                 if (string.IsNullOrEmpty(vfunc.Name))
                                     continue;
-                                Logger.Info("Adding symbol: " + vfunc.Name);
                                 allMangledNames.Add(vfunc.Name);
                             }
                             break;
@@ -111,7 +108,7 @@ namespace Amethyst.LibraryGenerator.Commands
 
             // Save updated checksums only if all operations succeeded
             symbolTracker.SaveChecksums(checksums);
-            Logger.Info("Library 'Minecraft.Windows.lib' generated succesfully.");
+            Logger.Debug("Library 'Minecraft.Windows.lib' generated succesfully.");
             return default;
         }
     }

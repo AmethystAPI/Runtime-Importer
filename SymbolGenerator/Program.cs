@@ -14,9 +14,9 @@ namespace Amethyst.SymbolGenerator
             Version version = Assembly.GetEntryAssembly()?.GetName()?.Version ?? new Version(1, 0, 0);
             string shortVersion = $"{version.Major}.{version.Minor}.{version.Build}";
             string name = Assembly.GetEntryAssembly()?.GetName()?.Name ?? "Amethyst.SymbolGenerator";
-            Logger.Info($"Starting '{name}' v{shortVersion}...");
-            Logger.Info($"Created by ryd3v for Amethyst.");
-            Logger.Info($"Repository: 'https://github.com/AmethystAPI/Runtime-Importer'.");
+            Logger.Debug($"Starting '{name}' v{shortVersion}...");
+            Logger.Debug($"Created by ryd3v for Amethyst.");
+            Logger.Debug($"Repository: 'https://github.com/AmethystAPI/Runtime-Importer'.");
 
             try
             {
