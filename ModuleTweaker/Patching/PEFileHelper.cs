@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using static System.Runtime.InteropServices.JavaScript.JSType;
@@ -55,7 +56,7 @@ namespace Amethyst.ModuleTweaker.Patching
         {
             if (!IsPatched())
                 return;
-            Logger.Info("Unpatching PE file...");
+            Logger.Debug("Unpatching PE file...");
             for (int i = File.Sections.Count - 1; i >= 0; i--)
             {
                 var section = File.Sections[i];
@@ -73,7 +74,7 @@ namespace Amethyst.ModuleTweaker.Patching
 
                 if (IsCustomSectionName(section.Name))
                 {
-                    Logger.Info($"Removing custom section '{section.Name}'...");
+                    Logger.Debug($"Removing custom section '{section.Name}'...");
                     File.Sections.RemoveAt(i);
                 }
             }
@@ -88,11 +89,11 @@ namespace Amethyst.ModuleTweaker.Patching
         {
             if (IsPatched())
             {
-                Logger.Info("PE file is already patched, unpatching it first.");
+                Logger.Debug("PE file is already patched, unpatching it first.");
                 Unpatch();
             }
 
-            Logger.Info("Patching PE file for runtime importing...");
+            Logger.Debug("Patching PE file for runtime importing...");
 
             // Get the import directory entries
             var importDirectory = File.OptionalHeader.GetDataDirectory(DataDirectoryIndex.ImportDirectory);
@@ -262,7 +263,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // byte: UsesSignature
                     // ulong: SignatureIndex or Address
                     count++;
-                    Logger.WriteLine(function.Name);
+                    Logger.Info($"Tweaked: '{function.Name}'.");
                 }
 
                 // Go back and write the count
@@ -310,7 +311,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // uint: IATIndex
                     // ulong: Address
                     count++;
-                    Logger.WriteLine(variable.Name);
+                    Logger.Info($"Tweaked: '{variable.Name}'.");
                 }
 
                 // Go back and write the count
@@ -351,7 +352,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // uint: NameIndex
                     // ulong: Address
                     count++;
-                    Logger.WriteLine(vtable.Name);
+                    Logger.Info($"Tweaked: '{vtable.Name}'.");
                 }
 
                 // Go back and write the count
@@ -393,7 +394,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // uint: VirtualTableNameIndex
                     // uint: FunctionIndex
                     count++;
-                    Logger.WriteLine(vfunc.Name);
+                    Logger.Info($"Tweaked: '{vfunc.Name}'.");
                 }
 
                 // Go back and write the count
@@ -434,9 +435,9 @@ namespace Amethyst.ModuleTweaker.Patching
                 File.OptionalHeader.SetDataDirectory(
                     DataDirectoryIndex.ImportDirectory,
                     new(section.Rva + sizeof(uint) * 2, (uint)ms.Length));
-                Logger.Info("Removed import from 'Minecraft.Windows.exe'.");
+                Logger.Debug("Removed import from 'Minecraft.Windows.exe'.");
             }
-            Logger.Info("Patching completed.");
+            Logger.Debug("Patching completed.");
             return true;
         }
 

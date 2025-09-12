@@ -13,11 +13,19 @@ namespace Amethyst.Common.Diagnostics
 
         public static void Info(object? message)
         {
-#if DEBUG
             WriteLine($"{(
                 Assembly.GetEntryAssembly()?.GetName()?.Name is { } name ?
                 $"[{name}] " :
                 "")}[INFO] {message}", ConsoleColor.White);
+        }
+
+        public static void Debug(object? message)
+        {
+#if DEBUG
+            WriteLine($"{(
+                Assembly.GetEntryAssembly()?.GetName()?.Name is { } name ?
+                $"[{name}] " :
+                "")}[DEBUG] {message}", ConsoleColor.White);
 #endif
         }
 
