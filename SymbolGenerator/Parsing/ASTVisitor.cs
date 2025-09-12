@@ -332,6 +332,13 @@ namespace Amethyst.SymbolGenerator.Parsing
                             return result;
                         }
                     }
+
+                    // Recurse into namespaces
+                    if (cursor.Kind == CXCursorKind.CXCursor_Namespace)
+                    {
+                        return CXChildVisitResult.CXChildVisit_Recurse;
+                    }
+
                     return CXChildVisitResult.CXChildVisit_Continue;
                 }, new CXClientData(nint.Zero));
             }
@@ -370,6 +377,13 @@ namespace Amethyst.SymbolGenerator.Parsing
                             return result;
                         }
                     }
+
+                    // Recurse into namespaces
+                    if (cursor.Kind == CXCursorKind.CXCursor_Namespace)
+                    {
+                        return CXChildVisitResult.CXChildVisit_Recurse;
+                    }
+
                     return CXChildVisitResult.CXChildVisit_Continue;
                 }, new CXClientData(nint.Zero));
             }
