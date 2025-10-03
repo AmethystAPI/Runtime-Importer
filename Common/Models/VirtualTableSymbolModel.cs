@@ -17,5 +17,8 @@ namespace Amethyst.Common.Models
 
         [JsonIgnore]
         public string ForWhat { get; set; } = string.Empty;
+
+        [JsonIgnore]
+        public string? VtableMangledLabel { get; set; } = string.Empty;
     }
 }

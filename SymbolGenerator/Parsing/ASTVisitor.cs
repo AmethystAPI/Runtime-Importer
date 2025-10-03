@@ -143,7 +143,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             {
                 if (cursor.CXXManglings is not null)
                     mangled = cursor.CXXManglings->FirstOrDefault().ToString();
-                else 
+                else
                     mangled = cursor.Mangling.ToString();
             }
             

@@ -263,7 +263,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // byte: UsesSignature
                     // ulong: SignatureIndex or Address
                     count++;
-                    Logger.Info($"Tweaked: '{function.Name}'.");
+                    Logger.Debug($"Tweaked: '{function.Name}'.");
                 }
 
                 // Go back and write the count
@@ -311,7 +311,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // uint: IATIndex
                     // ulong: Address
                     count++;
-                    Logger.Info($"Tweaked: '{variable.Name}'.");
+                    Logger.Debug($"Tweaked: '{variable.Name}'.");
                 }
 
                 // Go back and write the count
@@ -352,7 +352,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // uint: NameIndex
                     // ulong: Address
                     count++;
-                    Logger.Info($"Tweaked: '{vtable.Name}'.");
+                    Logger.Debug($"Tweaked: '{vtable.Name}'.");
                 }
 
                 // Go back and write the count
@@ -394,7 +394,7 @@ namespace Amethyst.ModuleTweaker.Patching
                     // uint: VirtualTableNameIndex
                     // uint: FunctionIndex
                     count++;
-                    Logger.Info($"Tweaked: '{vfunc.Name}'.");
+                    Logger.Debug($"Tweaked: '{vfunc.Name}'.");
                 }
 
                 // Go back and write the count
