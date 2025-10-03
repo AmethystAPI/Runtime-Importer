@@ -1,4 +1,5 @@
 ﻿using Amethyst.Common.Models;
+using Amethyst.Common.Utility;
 using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
 using System;
 using System.Collections.Generic;
@@ -29,7 +30,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
             if (args.Length < 1 || args.Length >= 3)
                 throw new UnhandledAnnotationException($"Virtual index annotation requires one or two arguments. Received {args.Length}", annotation);
 
-            bool inherit = args[0] == "inherit";
+            bool inherit = args[0] == "inherit" || args[0] == "i";
             if (inherit && method.OverrideOf is null)
                 throw new UnhandledAnnotationException("Virtual index annotation 'inherit' argument can only be used on methods that override a base method.", annotation);
 
@@ -41,7 +42,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
         {
             ASTMethod target = (annotation.Target as ASTMethod)!;
             string[] args = [.. annotation.Arguments];
-            bool inherit = args[0] == "inherit";
+            bool inherit = args[0] == "inherit" || args[0] == "i";
             string vtableName = args.Length > 1 ? args[1] : "this";
             return new ProcessedAnnotation(
                 annotation,

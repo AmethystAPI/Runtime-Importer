@@ -12,8 +12,8 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
                 throw new UnhandledAnnotationException($"Virtual table annotation can only be applied to classes. Applied to {annotation.Target.GetType().Name} instead.", annotation);
 
             string[] args = [.. annotation.Arguments];
-            if (args.Length < 1 || args.Length >= 3)
-                throw new UnhandledAnnotationException($"Virtual table annotation requires exactly one or two arguments. Received {args.Length}", annotation);
+            if (args.Length < 1 || args.Length >= 4)
+                throw new UnhandledAnnotationException($"Virtual table annotation requires exactly one, two or three arguments. Received {args.Length}", annotation);
 
             var targetAnnotations = annotation.Target.Annotations.Where(a => AnnotationProcessor.GetOfficialTagForAlias(a.Annotation.Tag) == "vtable");
             foreach (var existing in targetAnnotations)
@@ -31,13 +31,15 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
             ASTClass target = (annotation.Target as ASTClass)!;
             string[] args = [.. annotation.Arguments];
             string label = args.Length > 1 ? args[1] : "this";
+            string? vtableMangledLabel = args.Length > 2 ? args[2] : null;
             return new ProcessedAnnotation(
                 annotation,
                 new VirtualTableSymbolModel
                 {
                     Name = $"{target.FullName}::vtable::'{label}'",
                     Address = args[0],
-                    ForWhat = label
+                    ForWhat = label,
+                    VtableMangledLabel = vtableMangledLabel
                 }
             );
         }

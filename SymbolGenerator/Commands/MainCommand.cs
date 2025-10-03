@@ -163,16 +163,28 @@ namespace Amethyst.SymbolGenerator.Commands
                             annotationsData[location.File] = [];
                         annotationsData[location.File].Add(processed.Data);
 
-                        // Create helper symbol $vtable_for_X$ for virtual tables
                         if (processed.Data is VirtualTableSymbolModel vtable && processed.Target is ASTClass cls)
                         {
-                            var classMangle = string.Join("@", cls.FullName.Split("::").Reverse());
-                            string mangled = $"?$vtable_for_{vtable.ForWhat.Replace("::", "$")}@{classMangle}@@2_KA";
-                            annotationsData[location.File].Add(new VariableSymbolModel
+                            // Create helper symbol $vtable_for_X$ for virtual tables
                             {
-                                Name = mangled,
-                                Address = vtable.Address
-                            });
+                                string[] reverseClassName = [.. cls.FullName.Split("::").Reverse(), ""];
+                                string mangled = $"?$vtable_for_{vtable.ForWhat.Replace("::", "$")}@{string.Join("@", reverseClassName)}@2_KA";
+                                annotationsData[location.File].Add(new VariableSymbolModel
+                                {
+                                    Name = mangled,
+                                    Address = vtable.Address
+                                });
+                            }
+
+                            // Add vtable symbol so MSVC keeps being happy
+                            if (vtable.VtableMangledLabel is not null)
+                            {
+                                annotationsData[location.File].Add(new VariableSymbolModel
+                                {
+                                    Name = vtable.VtableMangledLabel,
+                                    Address = vtable.Address
+                                });
+                            }
                         }
                     }
                 });
