@@ -5,7 +5,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations
 {
     public static partial class CommentParser
     {
-        public static IEnumerable<RawAnnotation> ParseAnnotations(string comment, ASTCursorLocation location)
+        public static IEnumerable<RawAnnotation> ParseAnnotations(AbstractAnnotationTarget target, string comment, ASTCursorLocation location)
         {
             using var sr = new StringReader(comment);
             string? line;
@@ -21,7 +21,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations
                 string name = match.Groups[1].Value;
                 string? parameters = match.Groups[2].Success ? match.Groups[2].Value : null;
                 IEnumerable<string> parts = (parameters?.Split(',') ?? []).Select(a => a.Trim().TrimStart('"').TrimEnd('"'));
-                yield return new RawAnnotation(name, parts, location);
+                yield return new RawAnnotation(name, parts, location, target);
             }
         }
 

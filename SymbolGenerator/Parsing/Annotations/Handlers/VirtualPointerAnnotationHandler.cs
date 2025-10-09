@@ -15,7 +15,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
             if (args.Length < 1 || args.Length >= 4)
                 throw new UnhandledAnnotationException($"Virtual table annotation requires exactly one, two or three arguments. Received {args.Length}", annotation);
 
-            var targetAnnotations = annotation.Target.Annotations.Where(a => AnnotationProcessor.GetOfficialTagForAlias(a.Annotation.Tag) == "vtable");
+            var targetAnnotations = annotation.Target.Annotations.Where(a => AnnotationProcessor.GetCanonicalTagForAlias(a.Annotation.Tag) == "vtable");
             foreach (var existing in targetAnnotations)
             {
                 if (existing.Annotation.Arguments.ElementAt(1) == args[1])

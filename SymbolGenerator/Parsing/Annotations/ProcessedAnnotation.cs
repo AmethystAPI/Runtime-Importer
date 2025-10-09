@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 
 namespace Amethyst.SymbolGenerator.Parsing.Annotations
 {
-    public record ProcessedAnnotation(RawAnnotation Annotation, object Data, Action<IEnumerable<ProcessedAnnotation>, ProcessedAnnotation, AnnotationProcessor>? ResolveReferences = null)
+    public record ProcessedAnnotation(RawAnnotation Annotation, AnnotationID ID, object Data, Action<IEnumerable<ProcessedAnnotation>, ProcessedAnnotation, AnnotationProcessor>? ResolveReferences = null)
     {
         public AbstractAnnotationTarget Target => Annotation.Target;
         public bool Resolved { get; private set; } = false;
