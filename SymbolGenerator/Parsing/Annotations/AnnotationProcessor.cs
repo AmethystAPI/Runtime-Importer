@@ -1,14 +1,16 @@
 ﻿using Amethyst.Common.Diagnostics;
+using Amethyst.Common.Utility;
 using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
 using System.Reflection;
 
 namespace Amethyst.SymbolGenerator.Parsing.Annotations
 {
-    public class AnnotationProcessor
+    public class AnnotationProcessor(PlatformType type)
     {
         public static Dictionary<AnnotationHandlerAttribute, Type> Handlers { get; private set; }
         public HashSet<ProcessedAnnotation> ProcessedAnnotations { get; } = [];
         public HashSet<ProcessedAnnotation> ResolvedAnnotations { get; } = [];
+        public PlatformType PlatformType { get; private set; } = type;
 
         static AnnotationProcessor()
         {
@@ -23,7 +25,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations
                 .ToDictionary(t => t.attr, t => t.type);
         }
 
-        public static string GetOfficialTagForAlias(string tag)
+        public static string GetCanonicalTagForAlias(string tag)
         {
             string tagLower = tag.ToLowerInvariant();
             var handler = Handlers.FirstOrDefault(h => h.Key.Tags.Select(t => t.ToLowerInvariant()).Contains(tagLower));
@@ -59,25 +61,28 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations
                 return;
             }
 
-            AbstractAnnotationHandler handler = (AbstractAnnotationHandler)Activator.CreateInstance(handlerType, [this])!;
             ProcessedAnnotation processed;
             try
             {
-                handler.CanHandle(annotation);
+                AbstractAnnotationHandler handler = (AbstractAnnotationHandler)Activator.CreateInstance(handlerType, [this, annotation])!;
+                if (handler.CanHandle(annotation) == HandlerAction.SilentlySkip)
+                    return;
                 processed = handler.Handle(annotation);
-                annotation.Target.Annotations.Add(processed);
             }
-            catch (UnhandledAnnotationException ex)
+            catch (UnhandledAnnotationException ex) 
             {
                 Logger.Warn($"Skipping annotation '{annotation}' at {annotation.Location}: {ex.Message}");
                 return;
             }
-            catch
+            catch (Exception ex) 
             {
+                Logger.Warn($"Skipping annotation '{annotation}' at {annotation.Location}: {ex.InnerException?.Message}");
                 return;
             }
 
+
             ProcessedAnnotations.Add(processed);
+            annotation.Target.Annotations.Add(processed);
         }
     }
 }

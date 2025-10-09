@@ -1,13 +1,19 @@
 ﻿using Amethyst.Common.Models;
 using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
+using Amethyst.SymbolGenerator.Parsing.Annotations.ParameterPacks;
 
 namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
 {
     [AnnotationHandler("address", ["addr", "absolute", "abs", "at"])]
-    public class AddressAnnotationHandler(AnnotationProcessor processor) : AbstractAnnotationHandler(processor)
+    public class AddressAnnotationHandler(AnnotationProcessor processor, RawAnnotation annotation) : AbstractAnnotationHandler(processor, annotation)
     {
-        public override void CanHandle(RawAnnotation annotation)
+        public AddressAnnotationParameterPack ParameterPack { get; } = new AddressAnnotationParameterPack(annotation).Parse();
+
+        public override HandlerAction CanHandle(RawAnnotation annotation)
         {
+            if (ParameterPack.Platform != Processor.PlatformType)
+                return HandlerAction.SilentlySkip;
+
             if (annotation.Target is ASTMethod method)
             {
                 if (!method.IsImported)
@@ -23,28 +29,25 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
                 throw new UnhandledAnnotationException($"Address annotation can only be applied to methods or variables. Applied to {annotation.Target.GetType().Name} instead.", annotation);
             }
 
-            if (annotation.Target.HasAnyOfAnnotations([annotation.Tag, "signature"]))
+            if (annotation.Target.HasAnyOfAnnotations([
+                new(annotation.Tag, ParameterPack.Platform), 
+                new("signature", ParameterPack.Platform)
+            ]))
                 throw new UnhandledAnnotationException($"Multiple address or signature annotations applied to the same target {annotation.Target}.", annotation);
-            
-            string[] args = [.. annotation.Arguments];
-            if (args.Length != 1)
-                throw new UnhandledAnnotationException($"Address annotation requires exactly one argument. Received {args.Length}", annotation);
-            
-            if (!ulong.TryParse(args[0].Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out _))
-                throw new UnhandledAnnotationException($"Address annotation argument must be a valid hexadecimal number. Received {args[0]}", annotation);
+            return HandlerAction.Handle;
         }
 
         public override ProcessedAnnotation Handle(RawAnnotation annotation)
         {
-            string[] args = [.. annotation.Arguments];
             if (annotation.Target is ASTVariable variable)
             {
                 return new ProcessedAnnotation(
                     annotation,
+                    new(annotation.Tag, ParameterPack.Platform),
                     new VariableSymbolModel
                     {
                         Name = variable.MangledName,
-                        Address = args[0]
+                        Address = $"0x{ParameterPack.Address:x}"
                     }
                 );
             }
@@ -52,10 +55,11 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
             {
                 return new ProcessedAnnotation(
                     annotation,
+                    new(annotation.Tag, ParameterPack.Platform),
                     new FunctionSymbolModel
                     {
                         Name = method.MangledName,
-                        Address = args[0]
+                        Address = $"0x{ParameterPack.Address:x}"
                     }
                 );
             }

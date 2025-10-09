@@ -1,6 +1,7 @@
 ﻿using Amethyst.Common.Models;
 using Amethyst.Common.Utility;
 using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
+using Amethyst.SymbolGenerator.Parsing.Annotations.ParameterPacks;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,49 +11,44 @@ using System.Threading.Tasks;
 namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
 {
     [AnnotationHandler("vidx", ["virtualindex", "vindex"])]
-    public class VirtualIndexAnnotationHandler(AnnotationProcessor processor) : AbstractAnnotationHandler(processor)
+    public class VirtualIndexAnnotationHandler(AnnotationProcessor processor, RawAnnotation annotation) : AbstractAnnotationHandler(processor, annotation)
     {
-        public override void CanHandle(RawAnnotation annotation)
-        {
-            if (annotation.Target is not ASTMethod method)
-                throw new UnhandledAnnotationException($"Virtual index annotation can only be applied to methods. Applied to {annotation.Target.GetType().Name} instead.", annotation);
+        public VirtualIndexAnnotationParameterPack ParameterPack { get; } = new VirtualIndexAnnotationParameterPack(annotation).Parse();
 
-            if (!method.IsVirtual)
-                throw new UnhandledAnnotationException("Virtual index annotation can only be applied to virtual methods.", annotation);
+        public override HandlerAction CanHandle(RawAnnotation annotation)
+        {
+            if (ParameterPack.Platform != processor.PlatformType)
+                return HandlerAction.SilentlySkip;
+
+            // Validated by the Parameter Pack
+            ASTMethod method = (annotation.Target as ASTMethod)!;
 
             if (!method.IsImported)
                 throw new UnhandledAnnotationException("Virtual index annotation can only be applied to imported methods.", annotation);
 
-            if (annotation.Target.HasAnyOfAnnotations([annotation.Tag, "address", "signature"]))
+            if (annotation.Target.HasAnyOfAnnotations([
+                new(annotation.Tag, ParameterPack.Platform),
+                new("address", ParameterPack.Platform),
+                new("signature", ParameterPack.Platform)
+            ]))
                 throw new UnhandledAnnotationException($"Multiple virtual index, address or signature annotations applied to the same target {annotation.Target}.", annotation);
-
-            string[] args = [.. annotation.Arguments];
-            if (args.Length < 1 || args.Length >= 3)
-                throw new UnhandledAnnotationException($"Virtual index annotation requires one or two arguments. Received {args.Length}", annotation);
-
-            bool inherit = args[0] == "inherit" || args[0] == "i";
-            if (inherit && method.OverrideOf is null)
-                throw new UnhandledAnnotationException("Virtual index annotation 'inherit' argument can only be used on methods that override a base method.", annotation);
-
-            if (!inherit && !uint.TryParse(args[0], out _))
-                throw new UnhandledAnnotationException($"Virtual index annotation first argument must be a unsigned integer. Received {args[0]}", annotation);
+            return HandlerAction.Handle;
         }
 
         public override ProcessedAnnotation Handle(RawAnnotation annotation)
         {
+            // Validated by the Parameter Pack
             ASTMethod target = (annotation.Target as ASTMethod)!;
-            string[] args = [.. annotation.Arguments];
-            bool inherit = args[0] == "inherit" || args[0] == "i";
-            string vtableName = args.Length > 1 ? args[1] : "this";
             return new ProcessedAnnotation(
                 annotation,
+                new(annotation.Tag, ParameterPack.Platform),
                 new VirtualFunctionSymbolModel
                 {
                     Name = target.MangledName,
-                    Index = inherit ? 0 : uint.Parse(args[0]),
-                    VirtualTable = $"{target.DeclaringClass!.FullName}::vtable::'{vtableName}'",
-                    Inherit = inherit,
-                    Overrides = inherit ? target.OverrideOf!.MangledName : null
+                    Index = ParameterPack.Index,
+                    VirtualTable = $"{target.DeclaringClass!.FullName}::vtable::'{ParameterPack.TargetVirtualTable}'",
+                    Inherit = ParameterPack.ShouldInherit,
+                    Overrides = ParameterPack.ShouldInherit ? target.OverrideOf!.MangledName : null
                 },
                 Resolve
             );

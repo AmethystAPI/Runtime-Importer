@@ -2,11 +2,17 @@
 
 namespace Amethyst.SymbolGenerator.Parsing.Annotations
 {
-    public abstract class AbstractAnnotationHandler(AnnotationProcessor processor)
+    public enum HandlerAction {
+        Handle,
+        SilentlySkip
+    }
+
+    public abstract class AbstractAnnotationHandler(AnnotationProcessor processor, RawAnnotation annotation)
     {
         public readonly AnnotationProcessor Processor = processor;
+        public readonly RawAnnotation Annotation = annotation;
 
-        public abstract void CanHandle(RawAnnotation annotation);
+        public abstract HandlerAction CanHandle(RawAnnotation annotation);
         public abstract ProcessedAnnotation Handle(RawAnnotation annotation);
     }
 }

@@ -25,10 +25,18 @@ namespace Amethyst.SymbolGenerator.Commands
         [CommandOption("filters", 'f', Description = "List of filters to apply when generating symbols.")]
         public IReadOnlyList<string> Filters { get; set; } = null!;
 
+        [CommandOption("platform", 'p', Description = "Target platform for symbol generation (e.g., win-client, win-server).", IsRequired = false)]
+        public string Platform { get; set; } = "win-client";
+
         public ValueTask ExecuteAsync(IConsole console)
         {
             DirectoryInfo Input = new(InputPath);
             DirectoryInfo Output = new(OutputPath);
+            if (Platform == "win-any")
+                Logger.Fatal("Platform 'win-any' is not supported for symbol generation. Please specify either 'win-client' or 'win-server'.");
+
+            if (!PlatformUtility.TryParse(Platform, out PlatformType PlatformType))
+                Logger.Fatal($"Invalid platform '{Platform}'. Supported platforms are: win-client, win-server.");
 
             // Ensure input directory exists
             if (Input.Exists is false)
@@ -43,7 +51,7 @@ namespace Amethyst.SymbolGenerator.Commands
             {
                 headerTracker = new(
                     inputDirectory: Input,
-                    checksumFile: new FileInfo(Path.Combine(Output.FullName, "header_checksums.json")),
+                    checksumFile: new FileInfo(Path.Combine(Output.FullName, $"{Platform}_header_checksums.json")),
                     searchPatterns: ["*.h", "*.hpp", "*.hh", "*.hxx"],
                     filters: [.. Filters]
                 );
@@ -108,11 +116,7 @@ namespace Amethyst.SymbolGenerator.Commands
                     {
                         if (variable.RawComment is null || variable.Location is null || !willBeParsed.Contains(variable.Location.File))
                             continue;
-                        RawAnnotation[] anns = CommentParser.ParseAnnotations(variable.RawComment, variable.Location).ToArray();
-                        for (int i = 0; i < anns.Length; i++)
-                        {
-                            anns[i].Target = variable;
-                        }
+                        RawAnnotation[] anns = CommentParser.ParseAnnotations(variable, variable.RawComment, variable.Location).ToArray();
                         annotations.AddRange(anns);
                     }
 
@@ -121,11 +125,7 @@ namespace Amethyst.SymbolGenerator.Commands
                     {
                         if (cls.RawComment is null || cls.Location is null)
                             continue;
-                        RawAnnotation[] anns = CommentParser.ParseAnnotations(cls.RawComment, cls.Location).ToArray();
-                        for (int i = 0; i < anns.Length; i++)
-                        {
-                            anns[i].Target = cls;
-                        }
+                        RawAnnotation[] anns = CommentParser.ParseAnnotations(cls, cls.RawComment, cls.Location).ToArray();
                         annotations.AddRange(anns);
                     }
 
@@ -134,11 +134,7 @@ namespace Amethyst.SymbolGenerator.Commands
                     {
                         if (method.RawComment is null || method.Location is null)
                             continue;
-                        RawAnnotation[] anns = CommentParser.ParseAnnotations(method.RawComment, method.Location).ToArray();
-                        for (int i = 0; i < anns.Length; i++)
-                        {
-                            anns[i].Target = method;
-                        }
+                        RawAnnotation[] anns = CommentParser.ParseAnnotations(method, method.RawComment, method.Location).ToArray();
                         annotations.AddRange(anns);
                     }
                 });
@@ -146,7 +142,7 @@ namespace Amethyst.SymbolGenerator.Commands
                 Utils.Benchmark("Process annotations", () =>
                 {
                     // Process extracted annotations
-                    var processor = new AnnotationProcessor();
+                    var processor = new AnnotationProcessor(PlatformType);
                     Utils.Benchmark("Process and resolve annotations", () => processor.ProcessAndResolve(annotations));
                     foreach (var processed in processor.ProcessedAnnotations)
                     {

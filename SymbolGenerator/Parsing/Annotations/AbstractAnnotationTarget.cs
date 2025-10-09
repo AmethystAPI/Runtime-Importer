@@ -6,17 +6,16 @@
 
         public HashSet<ProcessedAnnotation> Annotations { get; set; } = [];
 
-        public bool HasAnnotation(string tag)
+        public bool HasAnnotation(AnnotationID id)
         {
-            string officialTag = AnnotationProcessor.GetOfficialTagForAlias(tag);
-            return Annotations.Any(a => a.Annotation.Tag.Equals(officialTag, StringComparison.OrdinalIgnoreCase));
+            return Annotations.Any(a => a.ID == id);
         }
 
-        public bool HasAnyOfAnnotations(IEnumerable<string> tags)
+        public bool HasAnyOfAnnotations(IEnumerable<AnnotationID> ids)
         {
-            foreach (var tag in tags)
+            foreach (var id in ids)
             {
-                if (HasAnnotation(tag))
+                if (HasAnnotation(id))
                     return true;
             }
             return false;
