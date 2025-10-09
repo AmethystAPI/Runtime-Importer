@@ -17,7 +17,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.ParameterPacks {
             if (args.Length < 1)
                 throw new UnhandledAnnotationException("Signature annotation requires at least one argument.", Annotation);
             if (!IDASignatureRegex().IsMatch(args[0]))
-                throw new UnhandledAnnotationException($"Signature annotation first argument must be a valid IDA-style signature. Received {args[0]}", annotation);
+                throw new UnhandledAnnotationException($"Signature annotation first argument must be a valid IDA-style signature. Received {args[0]}", Annotation);
             Signature = args[0];
             if (args.Length > 1)
                 if (PlatformUtility.TryParse(args[1], out var platformType))

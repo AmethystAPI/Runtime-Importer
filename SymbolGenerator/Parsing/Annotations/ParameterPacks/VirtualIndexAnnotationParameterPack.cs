@@ -15,11 +15,11 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.ParameterPacks {
         public PlatformType Platform { get; private set; } = PlatformType.WinClient;
 
         public override VirtualIndexAnnotationParameterPack Parse() {
-            if (annotation.Target is not ASTMethod method)
-                throw new UnhandledAnnotationException($"Virtual index annotation can only be applied to methods. Applied to {annotation.Target.GetType().Name} instead.", annotation);
+            if (Annotation.Target is not ASTMethod method)
+                throw new UnhandledAnnotationException($"Virtual index annotation can only be applied to methods. Applied to {Annotation.Target.GetType().Name} instead.", Annotation);
 
             if (!method.IsVirtual)
-                throw new UnhandledAnnotationException("Virtual index annotation can only be applied to virtual methods.", annotation);
+                throw new UnhandledAnnotationException("Virtual index annotation can only be applied to virtual methods.", Annotation);
 
             string[] args = [.. Annotation.Arguments];
             if (args.Length < 1)
@@ -43,7 +43,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.ParameterPacks {
             }
 
             if (ShouldInherit && method.OverrideOf is null)
-                throw new UnhandledAnnotationException("Virtual index annotation 'inherit' argument can only be used on methods that override a base method.", annotation);
+                throw new UnhandledAnnotationException("Virtual index annotation 'inherit' argument can only be used on methods that override a base method.", Annotation);
             TargetVirtualTable = args.Length > 1 ? args[1] : "this";
             if (args.Length > 2)
                 if (PlatformUtility.TryParse(args[2], out var platformType))

@@ -11,7 +11,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
 
         public override HandlerAction CanHandle(RawAnnotation annotation)
         {
-            if (ParameterPack.Platform != processor.PlatformType)
+            if (ParameterPack.Platform != Processor.PlatformType)
                 return HandlerAction.SilentlySkip;
 
             var targetAnnotations = annotation.Target.Annotations.Where(a => AnnotationProcessor.GetCanonicalTagForAlias(a.Annotation.Tag) == "vtable");

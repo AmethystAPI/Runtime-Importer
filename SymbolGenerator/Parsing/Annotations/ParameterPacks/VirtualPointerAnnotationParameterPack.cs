@@ -16,7 +16,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.ParameterPacks {
 
         public override VirtualPointerAnnotationParameterPack Parse() {
             if (Annotation.Target is not ASTClass cls)
-                throw new UnhandledAnnotationException($"Virtual pointer annotation can only be applied to classes or structs. Applied to {annotation.Target.GetType().Name} instead.", annotation);
+                throw new UnhandledAnnotationException($"Virtual pointer annotation can only be applied to classes or structs. Applied to {Annotation.Target.GetType().Name} instead.", Annotation);
 
             string[] args = [.. Annotation.Arguments];
             if (args.Length < 1)
