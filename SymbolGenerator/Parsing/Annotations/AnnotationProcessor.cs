@@ -69,11 +69,17 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations
                     return;
                 processed = handler.Handle(annotation);
             }
-            catch (UnhandledAnnotationException ex)
+            catch (UnhandledAnnotationException ex) 
             {
                 Logger.Warn($"Skipping annotation '{annotation}' at {annotation.Location}: {ex.Message}");
                 return;
             }
+            catch (Exception ex) 
+            {
+                Logger.Warn($"Skipping annotation '{annotation}' at {annotation.Location}: {ex.InnerException?.Message}");
+                return;
+            }
+
 
             ProcessedAnnotations.Add(processed);
             annotation.Target.Annotations.Add(processed);

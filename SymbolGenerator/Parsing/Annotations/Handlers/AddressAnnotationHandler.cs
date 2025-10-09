@@ -47,7 +47,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
                     new VariableSymbolModel
                     {
                         Name = variable.MangledName,
-                        Address = $"0x{ParameterPack.Address}"
+                        Address = $"0x{ParameterPack.Address:x}"
                     }
                 );
             }
@@ -59,7 +59,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
                     new FunctionSymbolModel
                     {
                         Name = method.MangledName,
-                        Address = $"0x{ParameterPack.Address}"
+                        Address = $"0x{ParameterPack.Address:x}"
                     }
                 );
             }
