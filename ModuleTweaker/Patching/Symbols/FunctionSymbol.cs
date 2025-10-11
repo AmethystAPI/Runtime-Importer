@@ -43,7 +43,6 @@ namespace Amethyst.ModuleTweaker.Patching.Symbols {
 
             // Write base class data first
             base.Write(writer);
-
             writer.Write((byte)(IsVirtual ? 1 : 0));
             if (IsVirtual) {
                 writer.Write(VirtualIndex);

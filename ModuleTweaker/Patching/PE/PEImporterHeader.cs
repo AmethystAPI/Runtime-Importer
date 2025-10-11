@@ -25,9 +25,8 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                 throw new InvalidOperationException($"Invalid header context type. Expected PEHeaderContext, got {ctx.GetType()}.");
 
             // Call base to write common layout
-            base.Write(ctx, writer);
-
             // Write PE-specific fields
+            base.Write(ctx, writer);
             writer.Write(peCtx.IATVirtualAddress);
             writer.Write(peCtx.IATCount);
         }

@@ -19,7 +19,6 @@ namespace Amethyst.ModuleTweaker.Patching.Symbols {
 
             // Write base class data first
             base.Write(writer);
-
             writer.Write(Address);
         }
     }
