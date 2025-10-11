@@ -2,7 +2,7 @@
   "profiles": {
     "Generate Symbols": {
       "commandName": "Project",
-      "commandLineArgs": "-i \"./input/src\"\r\n-o \"./output\"\r\n-f \"mc\"\r\n-p \"win-client\"\r\n--\r\n-x c++\r\n-std=c++23\r\n-include-pch \"./input/src/pch.hpp.pch\"\r\n-fms-extensions\r\n-fms-compatibility\r\n-fms-define-stdc\r\n-I\"./input/include\"\r\n-I\"./input/src\""
+      "commandLineArgs": "-i \"./input/src\"\r\n-o \"./output\"\r\n-f \"mc\"\r\n-p \"win-client\"\r\n--\r\n-x c++\r\n-std=c++23\r\n-fms-extensions\r\n-fms-compatibility\r\n-fms-define-stdc\r\n-I\"./input/include\"\r\n-I\"./input/src\""
     }
   }
 }

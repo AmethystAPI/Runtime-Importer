@@ -428,7 +428,7 @@ namespace Amethyst.SymbolGenerator.Parsing
                     bool isVirtualBase = c.IsVirtualBase;
                     CXType type = c.Type;
                     CXCursor decl = type.Declaration;
-                    ASTClass? classInfo = VisitClass(decl, decl.SemanticParent, decl.Usr.ToString()).rawClass;
+                    ASTClass? classInfo = VisitClass(decl, decl.SemanticParent, GetUsr(decl)).rawClass;
                     return classInfo is not null ? new ASTBaseSpecifier()
                     {
                         Class = classInfo,
@@ -439,17 +439,17 @@ namespace Amethyst.SymbolGenerator.Parsing
 
             // Find methods
             List<ASTMethod> methods = [.. methodsCursors
-                .Select(c => VisitMethod(c, cursor, c.Usr.ToString()).method
+                .Select(c => VisitMethod(c, cursor, GetUsr(c)).method
             ).Where(t => t is not null)!];
 
             // Find variables
             List<ASTVariable> variables = [.. variableCursors
-                .Select(c => VisitVariable(c, cursor, c.Usr.ToString()).variable
+                .Select(c => VisitVariable(c, cursor, GetUsr(c)).variable
             ).Where(t => t is not null)!];
 
             // Find nested classes
             List<ASTClass> nestedClasses = [.. classesCursors
-                .Select(c => VisitClass(c, cursor, c.Usr.ToString()).rawClass
+                .Select(c => VisitClass(c, cursor, GetUsr(c)).rawClass
             ).Where(t => t is not null)!];
 
             ASTClass rawClass = new()
@@ -483,7 +483,7 @@ namespace Amethyst.SymbolGenerator.Parsing
                 if (overriden.Length > 0)
                 {
                     var first = overriden[0];
-                    var (_, overrideOfMethod) = VisitMethod(first, first.SemanticParent, first.Usr.ToString());
+                    var (_, overrideOfMethod) = VisitMethod(first, first.SemanticParent, GetUsr(first));
                     overrideOf = overrideOfMethod;
                 }
             }
