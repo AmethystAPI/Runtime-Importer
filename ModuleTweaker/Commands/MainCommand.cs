@@ -1,11 +1,14 @@
 ﻿using Amethyst.Common.Diagnostics;
 using Amethyst.Common.Models;
 using Amethyst.ModuleTweaker.Patching;
+using Amethyst.ModuleTweaker.Patching.PE;
+using Amethyst.ModuleTweaker.Patching.Symbols;
 using AsmResolver.PE.File;
 using CliFx;
 using CliFx.Attributes;
 using CliFx.Infrastructure;
 using Newtonsoft.Json;
+using System.Globalization;
 
 namespace Amethyst.ModuleTweaker.Commands
 {
@@ -34,12 +37,20 @@ namespace Amethyst.ModuleTweaker.Commands
                 return default;
             }
 
+            ulong ParseAddress(string? address)
+            {
+                if (string.IsNullOrEmpty(address))
+                    return 0x0;
+                if (address.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                    address = address[2..];
+                if (!ulong.TryParse(address, NumberStyles.HexNumber, null, out var addr))
+                    return 0x0;
+                return addr;
+            }
+
             // Collect all symbol files and accumulate mangled names
             IEnumerable<FileInfo> symbolFiles = symbols.EnumerateFiles("*.json", SearchOption.AllDirectories);
-            HashSet<FunctionSymbolModel> methods = [];
-            HashSet<VariableSymbolModel> variables = [];
-            HashSet<VirtualTableSymbolModel> vtables = [];
-            HashSet<VirtualFunctionSymbolModel> vfuncs = [];
+            List<ImportedSymbol> importedSymbols = [];
             foreach (var symbolFile in symbolFiles)
             {
                 using var stream = symbolFile.OpenRead();
@@ -54,25 +65,43 @@ namespace Amethyst.ModuleTweaker.Commands
                             {
                                 if (string.IsNullOrEmpty(function.Name))
                                     continue;
-                                methods.Add(function);
+
+                                importedSymbols.Add(new FunctionSymbol {
+                                    Name = function.Name,
+                                    IsVirtual = false,
+                                    IsSignature = function.Signature is not null,
+                                    Address = ParseAddress(function.Address),
+                                    Signature = function.Signature ?? string.Empty
+                                });
                             }
                             foreach (var variable in symbolJson.Variables)
                             {
                                 if (string.IsNullOrEmpty(variable.Name))
                                     continue;
-                                variables.Add(variable);
+                                importedSymbols.Add(new VariableSymbol {
+                                    Name = variable.Name,
+                                    Address = ParseAddress(variable.Address)
+                                });
                             }
                             foreach (var vtable in symbolJson.VirtualTables)
                             {
                                 if (string.IsNullOrEmpty(vtable.Name))
                                     continue;
-                                vtables.Add(vtable);
+                                importedSymbols.Add(new VirtualPointerSymbol {
+                                    Name = vtable.Name,
+                                    Address = ParseAddress(vtable.Address)
+                                });
                             }
                             foreach (var vfunc in symbolJson.VirtualFunctions)
                             {
                                 if (string.IsNullOrEmpty(vfunc.Name))
                                     continue;
-                                vfuncs.Add(vfunc);
+                                importedSymbols.Add(new FunctionSymbol {
+                                    Name = vfunc.Name,
+                                    IsVirtual = true,
+                                    VirtualIndex = vfunc.Index,
+                                    VirtualTable = vfunc.VirtualTable ?? "this"
+                                });
                             }
                             break;
                     }
@@ -83,8 +112,8 @@ namespace Amethyst.ModuleTweaker.Commands
             {
                 // Patch the module
                 var file = PEFile.FromFile(ModulePath);
-                PEFileHelper helper = new(file);
-                if (helper.Patch(methods, variables, vtables, vfuncs))
+                var patcher = new PEPatcher(file, importedSymbols);
+                if (patcher.Patch())
                 {
                     file.AlignSections();
                     File.Copy(ModulePath, ModulePath + ".backup", true);
