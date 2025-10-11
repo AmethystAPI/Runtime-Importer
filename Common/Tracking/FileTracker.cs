@@ -72,7 +72,7 @@ namespace Amethyst.Common.Tracking
                 if (Filters.Any() && !Filters.Any(f => Path.GetRelativePath(InputDirectory.FullName, file.FullName).StartsWith(f)))
                     continue;
                 string filePath = file.FullName.NormalizeSlashes();
-#if !DEBUG
+#if DEBUG
                 string content = File.ReadAllText(file.FullName);
                 ulong hash = XXH64.DigestOf(Encoding.UTF8.GetBytes(content));
 

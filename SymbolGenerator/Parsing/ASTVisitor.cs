@@ -84,7 +84,7 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         public string GetUsr(CXCursor cursor)
         {
-            return cursor.Usr.ToString() + cursor.IsDefinition;
+            return cursor.Usr.ToString() + "@" + cursor.IsDefinition;
         }
 
         public string GetSpelling(CXCursor cursor)
