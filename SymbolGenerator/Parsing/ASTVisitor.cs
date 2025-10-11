@@ -222,10 +222,11 @@ namespace Amethyst.SymbolGenerator.Parsing
             return file.StartsWith(InputDirectory, StringComparison.Ordinal) && StrictHeaders.Contains(file);
         }
 
-        private (List<CXCursor> methods, List<CXCursor> vars, List<CXCursor> bases) CollectClassMembers(CXCursor cursor)
+        private (List<CXCursor> methods, List<CXCursor> vars, List<CXCursor> classes, List<CXCursor> bases) CollectClassMembers(CXCursor cursor)
         {
             var methods = new List<CXCursor>();
             var vars = new List<CXCursor>();
+            var classes = new List<CXCursor>();
             var bases = new List<CXCursor>();
 
             unsafe
@@ -248,12 +249,16 @@ namespace Amethyst.SymbolGenerator.Parsing
                         case CXCursorKind.CXCursor_CXXBaseSpecifier:
                             bases.Add(c);
                             break;
+                        case CXCursorKind.CXCursor_ClassDecl:
+                        case CXCursorKind.CXCursor_StructDecl:
+                            classes.Add(c);
+                            break;
                     }
                     return CXChildVisitResult.CXChildVisit_Continue;
                 }, new CXClientData(nint.Zero));
             }
 
-            return (methods, vars, bases);
+            return (methods, vars, classes, bases);
         }
 
         public ASTClass[] GetClasses()
@@ -414,7 +419,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             ASTCursorLocation? location = GetLocation(cursor);
 
             // Collect members
-            var (methodsCursors, variableCursors, baseCursors) = CollectClassMembers(cursor);
+            var (methodsCursors, variableCursors, classesCursors, baseCursors) = CollectClassMembers(cursor);
 
             // Find base classes
             List<ASTBaseSpecifier> baseClasses = [.. baseCursors
@@ -440,6 +445,11 @@ namespace Amethyst.SymbolGenerator.Parsing
             // Find variables
             List<ASTVariable> variables = [.. variableCursors
                 .Select(c => VisitVariable(c, cursor, c.Usr.ToString()).variable
+            ).Where(t => t is not null)!];
+
+            // Find nested classes
+            List<ASTClass> nestedClasses = [.. classesCursors
+                .Select(c => VisitClass(c, cursor, c.Usr.ToString()).rawClass
             ).Where(t => t is not null)!];
 
             ASTClass rawClass = new()

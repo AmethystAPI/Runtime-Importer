@@ -114,7 +114,7 @@ namespace Amethyst.SymbolGenerator.Commands
                     // Extract annotations from variables
                     foreach (var variable in variables)
                     {
-                        if (variable.RawComment is null || variable.Location is null || !willBeParsed.Contains(variable.Location.File))
+                        if (variable.RawComment is null || variable.Location is null)
                             continue;
                         RawAnnotation[] anns = CommentParser.ParseAnnotations(variable, variable.RawComment, variable.Location).ToArray();
                         annotations.AddRange(anns);
