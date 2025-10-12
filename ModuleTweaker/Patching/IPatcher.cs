@@ -8,7 +8,6 @@ namespace Amethyst.ModuleTweaker.Patching {
     public interface IPatcher {
         bool IsPatched();
         bool RemoveSection(string name);
-        void Unpatch();
         bool Patch();
         bool IsCustomSection(string name);
     }

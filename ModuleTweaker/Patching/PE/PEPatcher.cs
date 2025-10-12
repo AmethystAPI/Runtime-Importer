@@ -1,11 +1,10 @@
 ﻿using Amethyst.Common.Diagnostics;
-using AsmResolver;
-using AsmResolver.IO;
-using AsmResolver.PE.File;
-using AsmResolver.PE.File.Headers;
+using LibObjectFile.Diagnostics;
+using LibObjectFile.PE;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -14,12 +13,8 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
         // Runtime Importer Header
         public const string SectionRTIH = ".rtih";
 
-        // New Import Descriptor Table
-        public const string SectionIDNEW = ".idnew";
-
         public static HashSet<string> CustomSections { get; } = [
-            SectionRTIH,
-            SectionIDNEW
+            SectionRTIH
         ];
 
         public PEFile File { get; } = file;
@@ -37,140 +32,89 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
             return false;
         }
 
+        static uint AlignSectionRVA(uint value, uint align) => (value + align - 1) & ~(align - 1);
+
         public bool Patch() {
             // Version 1 full PE-specific layout:
             // .rtih - Runtime Importer Header
             // [PEImporterHeader data]
-            // .idnew - New Import Descriptor Table
-            // [4 bytes] Original IDT RVA
-            // [4 bytes] Original IDT Size
-            // [New IDT data (old IDT minus "Minecraft.Windows.exe")]
 
             if (IsPatched()) {
-                Logger.Debug("PE file is already patched, unpatching it first.");
-                Unpatch();
+                Logger.Debug("PE file is already patched, no reason to repatch.");
+                return false;
             }
 
             Logger.Debug("Patching PE file for runtime importing...");
 
             // Get the import directory entries
-            var importDirectory = File.OptionalHeader.GetDataDirectory(DataDirectoryIndex.ImportDirectory);
-            if (!importDirectory.IsPresentInPE) {
+            var importDirectory = File.Directories.Import;
+            if (importDirectory is null) {
                 Logger.Warn("PE file has no import directory, no reason to patch it.");
                 return false;
             }
 
-            // Read existing import descriptors
-            List<ImportDescriptor> importDescriptors = [];
-            {
-                var importDirectoryReader = File.CreateDataDirectoryReader(importDirectory);
-                while (importDirectoryReader.CanRead(ImportDescriptor.Size)) {
-                    var descriptor = ImportDescriptor.Read(ref importDirectoryReader);
-                    if (descriptor.IsZero)
-                        break;
-                    importDescriptors.Add(descriptor);
-                }
-            }
-
-            // Find the import descriptor for "Minecraft.Windows.exe"
-            ImportDescriptor? minecraftWindowsImportDescriptor = null;
-            foreach (var descriptor in importDescriptors) {
-                var nameRva = descriptor.Name;
-                var name = File.CreateReaderAtRva(nameRva).ReadAsciiString();
-                if (name.StartsWith("Minecraft.Windows", StringComparison.OrdinalIgnoreCase)) {
-                    minecraftWindowsImportDescriptor = descriptor;
-                    break;
-                }
-            }
+            // Find the import directory entry for "Minecraft.Windows.exe"
+            PEImportDirectoryEntry? targetImportDirectoryEntry = importDirectory.Entries.FirstOrDefault(e => e.ImportDllNameLink.Resolve()?.StartsWith("Minecraft.Windows", StringComparison.OrdinalIgnoreCase) ?? false);
 
             // If not found, no reason to patch
-            if (minecraftWindowsImportDescriptor is null) {
+            if (targetImportDirectoryEntry is null) {
                 Logger.Warn("PE file does not import from 'Minecraft.Windows.exe', no reason to patch it.");
                 return false;
             }
 
             // Map all mangled names for "Minecraft.Windows.exe" functions to IAT offsets
-            uint iatRva = minecraftWindowsImportDescriptor.Value.FirstThunk;
+            uint iatRva = targetImportDirectoryEntry.ImportAddressTable.RVA;
             uint iatCount = 0;
             Dictionary<string, uint> iatIndices = [];
-            {
-                var reader = File.CreateReaderAtRva(minecraftWindowsImportDescriptor.Value.OriginalFirstThunk);
-                uint iatIndex = 0;
-                while (reader.CanRead(sizeof(ulong))) {
-                    ulong iltEntry = reader.ReadUInt64();
-                    if (iltEntry == 0)
-                        break;
-                    iatIndex++;
-                    bool isOrdinal = (iltEntry & 0x8000000000000000) != 0;
-                    if (isOrdinal)
-                        continue;
-
-                    uint hintNameRva = (uint)(iltEntry & 0x7FFFFFFFFFFFFFFF);
-                    var hintNameReader = File.CreateReaderAtRva(hintNameRva);
-                    ushort hint = hintNameReader.ReadUInt16();
-                    string functionName = hintNameReader.ReadAsciiString();
-                    iatIndices[functionName] = iatIndex - 1;
+            foreach (var import in targetImportDirectoryEntry.ImportLookupTable.Entries) {
+                iatCount++;
+                if (import.IsImportByOrdinal)
+                    continue;
+                var name = import.HintName.Resolve().Name;
+                if (name is not null) {
+                    iatIndices[name] = iatCount - 1;
                 }
-                iatCount = iatIndex;
             }
 
             // Create the PEHeaderContext
             var context = new PEHeaderContext(File, iatRva, iatCount);
+            var lastSection = File.Sections[^1]!;
+            var sectionAlignment = File.OptionalHeader.SectionAlignment;
+            var fileAlignment = File.OptionalHeader.FileAlignment;
+            var nextRVA = AlignSectionRVA(lastSection.RVA + lastSection.VirtualSize, sectionAlignment);
 
             // Create the RTIH section
-            {
-                PESection section = new(
-                    SectionRTIH,
-                    SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
-                using var ms = new MemoryStream();
-                var writer = new BinaryWriter(ms);
+            PESection rtihSection = File.AddSection(SectionRTIH, nextRVA);
+            rtihSection.Characteristics = SectionCharacteristics.ContainsInitializedData | SectionCharacteristics.MemRead;
+            var rthiStream = new PEStreamSectionData();
 
-                // Create the PEImporterHeader
-                var header = new PEImporterHeader() {
-                    Format = HeaderFormat.PE,
-                    Version = 1,
-                    Symbols = Symbols
-                };
+            var header = new PEImporterHeader() {
+                Format = HeaderFormat.PE,
+                Version = 1,
+                Symbols = Symbols
+            };
+            using var writer = new BinaryWriter(rthiStream.Stream, Encoding.UTF8, true);
+            header.Write(context, writer);
+            rtihSection.Content.Add(rthiStream);
 
-                // Write the entire header
-                header.Write(context, writer);
-
-                // Finalize the section
-                section.Contents = new DataSegment(ms.ToArray());
-                File.Sections.Add(section);
-            }
-
-            // Create new import descriptor table section
-            {
-                PESection section = new(
-                    SectionIDNEW,
-                    SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
-                
-                using var ms = new MemoryStream();
-                var writer = new BinaryStreamWriter(ms);
-
-                // Write original import directory RVA and size at the start
-                writer.WriteUInt32(importDirectory.VirtualAddress);
-                writer.WriteUInt32(importDirectory.Size);
-
-                foreach (var descriptor in importDescriptors) {
-                    if (descriptor.Equals(minecraftWindowsImportDescriptor.Value))
-                        continue;
-                    descriptor.Write(writer);
+            // Remove the target import directory entry from the import directory
+            importDirectory.Entries.Remove(targetImportDirectoryEntry);
+            DiagnosticBag diags = new() { EnableStackTrace = true };
+            File.Verify(diags);
+            foreach (var diag in diags.Messages) {
+                switch (diag.Kind) {
+                    case DiagnosticKind.Error:
+                        Logger.Error(diag.ToString());
+                        break;
+                    case DiagnosticKind.Warning:
+                        Logger.Warn(diag.ToString());
+                        break;
+                    default:
+                        Logger.Info(diag.ToString());
+                        break;
                 }
-
-                // Write null descriptor at the end
-                ImportDescriptor.Empty.Write(writer);
-                section.Contents = new DataSegment(ms.ToArray());
-                File.Sections.Add(section);
-                File.AlignSections();
-
-                // Update import directory to point to the new table
-                File.OptionalHeader.SetDataDirectory(
-                    DataDirectoryIndex.ImportDirectory,
-                    new(section.Rva + sizeof(uint) * 2, (uint)ms.Length));
-                Logger.Debug("Removed import from 'Minecraft.Windows.exe'.");
             }
+            Logger.Debug("Removed import from 'Minecraft.Windows.exe'.");
             Logger.Debug("Patching completed.");
             return true;
         }
@@ -181,31 +125,6 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                 return File.Sections.Remove(section);
             }
             return false;
-        }
-
-        public void Unpatch() {
-            if (!IsPatched())
-                return;
-            Logger.Debug("Unpatching PE file...");
-            for (int i = File.Sections.Count - 1; i >= 0; i--) {
-                var section = File.Sections[i];
-                if (section.Name == SectionIDNEW) {
-                    BinaryStreamReader reader = section.CreateReader();
-                    uint originalIDTRva = reader.ReadUInt32();
-                    uint originalIDTSize = reader.ReadUInt32();
-
-                    File.OptionalHeader.SetDataDirectory(
-                        DataDirectoryIndex.ImportDirectory,
-                        new(originalIDTRva, originalIDTSize)
-                    );
-                }
-
-                if (IsCustomSection(section.Name)) {
-                    Logger.Debug($"Removing custom section '{section.Name}'...");
-                    File.Sections.RemoveAt(i);
-                }
-            }
-            File.AlignSections();
         }
     }
 }

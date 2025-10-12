@@ -1,4 +1,4 @@
-﻿using AsmResolver.PE.File;
+﻿using LibObjectFile.PE;
 using System;
 using System.Collections.Generic;
 using System.Linq;

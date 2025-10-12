@@ -1,5 +1,4 @@
-﻿using AsmResolver.IO;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -31,18 +30,18 @@ namespace Amethyst.ModuleTweaker.Patching.PE
             }
         }
 
-        public static ImportDescriptor Read(ref BinaryStreamReader reader)
+        public static ImportDescriptor Read(BinaryReader reader)
         {
-            Span<byte> bytes = stackalloc byte[(int)Size];
-            if (reader.ReadBytes(bytes) != Size)
+            var bytes = reader.ReadBytes((int)Size);
+            if (bytes.Length != Size)
                 throw new ArgumentException("Not enough data to read ImportDescriptor.");
             return MemoryMarshal.Read<ImportDescriptor>(bytes);
         }
 
-        public void Write(BinaryStreamWriter writer)
+        public void Write(BinaryWriter writer)
         {
             Span<byte> bytes = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref this, 1));
-            writer.WriteBytes(bytes);
+            writer.Write(bytes);
         }
 
         public override bool Equals(object? obj)

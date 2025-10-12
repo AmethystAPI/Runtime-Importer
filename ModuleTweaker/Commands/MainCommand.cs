@@ -3,10 +3,10 @@ using Amethyst.Common.Models;
 using Amethyst.ModuleTweaker.Patching;
 using Amethyst.ModuleTweaker.Patching.PE;
 using Amethyst.ModuleTweaker.Patching.Symbols;
-using AsmResolver.PE.File;
 using CliFx;
 using CliFx.Attributes;
 using CliFx.Infrastructure;
+using LibObjectFile.PE;
 using Newtonsoft.Json;
 using System.Globalization;
 
@@ -111,13 +111,15 @@ namespace Amethyst.ModuleTweaker.Commands
             try
             {
                 // Patch the module
-                var file = PEFile.FromFile(ModulePath);
+                using var str = File.Open(ModulePath, FileMode.Open, FileAccess.ReadWrite);
+                var file = PEFile.Read(str, new PEImageReaderOptions { EnableStackTrace = true });
                 var patcher = new PEPatcher(file, importedSymbols);
                 if (patcher.Patch())
                 {
-                    file.AlignSections();
-                    File.Copy(ModulePath, ModulePath + ".backup", true);
-                    file.Write(ModulePath);
+                    using var copyStr = File.Create(ModulePath + ".backup");
+                    str.Seek(0, SeekOrigin.Begin);
+                    str.CopyTo(copyStr);
+                    file.Write(str);
                 }
             }
             catch (Exception ex)
