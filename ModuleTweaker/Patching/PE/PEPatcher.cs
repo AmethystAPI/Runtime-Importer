@@ -1,24 +1,24 @@
 ﻿using Amethyst.Common.Diagnostics;
-using LibObjectFile.Diagnostics;
-using LibObjectFile.PE;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection.PortableExecutable;
+using Amethyst.ModuleTweaker.Patching.PE.V1;
+using Amethyst.ModuleTweaker.Utility;
+using AsmResolver;
+using AsmResolver.PE.File;
+using AsmResolver.PE.File.Headers;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Amethyst.ModuleTweaker.Patching.PE {
-    public class PEPatcher(PEFile file, List<ImportedSymbol> symbols) : IPatcher {
+    public class PEPatcher(PEFile file, List<AbstractSymbol> symbols) : IPatcher {
         // Runtime Importer Header
-        public const string SectionRTIH = ".rtih";
+        public const string SectionRTIH = ".rtih"; // Runtime Importer Header
+        public const string SectionNIDT = ".nidt"; // New Import Directory Table
 
         public static HashSet<string> CustomSections { get; } = [
-            SectionRTIH
+            SectionRTIH,
+            SectionNIDT
         ];
 
         public PEFile File { get; } = file;
-        public List<ImportedSymbol> Symbols { get; } = symbols;
+        public List<AbstractSymbol> Symbols { get; } = symbols;
 
         public bool IsCustomSection(string name) {
             return CustomSections.Contains(name);
@@ -32,90 +32,121 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
             return false;
         }
 
-        static uint AlignSectionRVA(uint value, uint align) => (value + align - 1) & ~(align - 1);
-
         public bool Patch() {
             // Version 1 full PE-specific layout:
             // .rtih - Runtime Importer Header
             // [PEImporterHeader data]
 
             if (IsPatched()) {
-                Logger.Debug("PE file is already patched, no reason to repatch.");
+                if (!Unpatch())
+                    Logger.Fatal("Failed to unpatch existing patch, cannot re-patch.");
+            }
+
+            Logger.Debug("Patching PE file...");
+            var importDirectory = File.OptionalHeader.GetDataDirectory(DataDirectoryIndex.ImportDirectory);
+            if (!importDirectory.IsPresentInPE) {
+                Logger.Warn("PE file has no import directory, skipping patch.");
                 return false;
             }
 
-            Logger.Debug("Patching PE file for runtime importing...");
-
-            // Get the import directory entries
-            var importDirectory = File.Directories.Import;
-            if (importDirectory is null) {
-                Logger.Warn("PE file has no import directory, no reason to patch it.");
-                return false;
-            }
-
-            // Find the import directory entry for "Minecraft.Windows.exe"
-            PEImportDirectoryEntry? targetImportDirectoryEntry = importDirectory.Entries.FirstOrDefault(e => e.ImportDllNameLink.Resolve()?.StartsWith("Minecraft.Windows", StringComparison.OrdinalIgnoreCase) ?? false);
-
-            // If not found, no reason to patch
-            if (targetImportDirectoryEntry is null) {
-                Logger.Warn("PE file does not import from 'Minecraft.Windows.exe', no reason to patch it.");
-                return false;
-            }
-
-            // Map all mangled names for "Minecraft.Windows.exe" functions to IAT offsets
-            uint iatRva = targetImportDirectoryEntry.ImportAddressTable.RVA;
-            uint iatCount = 0;
-            Dictionary<string, uint> iatIndices = [];
-            foreach (var import in targetImportDirectoryEntry.ImportLookupTable.Entries) {
-                iatCount++;
-                if (import.IsImportByOrdinal)
-                    continue;
-                var name = import.HintName.Resolve().Name;
-                if (name is not null) {
-                    iatIndices[name] = iatCount - 1;
+            // Read existing import descriptors
+            using var importReader = File.CreateDataDirectoryReader(importDirectory).ToReader();
+            List<ImportDescriptor> importDescriptors = [];
+            uint targetIATRVA = 0;
+            uint targetILTRVA = 0;
+            while (true) {
+                var entry = ImportDescriptor.Read(importReader);
+                if (entry.IsZero)
+                    break;
+                string name = File.CreateReaderAtRva(entry.Name).ReadAsciiString();
+                if (name.StartsWith("Minecraft.Windows", StringComparison.OrdinalIgnoreCase)) {
+                    targetIATRVA = entry.OriginalFirstThunk;
+                    targetILTRVA = entry.FirstThunk;
                 }
+                importDescriptors.Add(entry);
             }
 
-            // Create the PEHeaderContext
-            var context = new PEHeaderContext(File, iatRva, iatCount);
-            var lastSection = File.Sections[^1]!;
-            var sectionAlignment = File.OptionalHeader.SectionAlignment;
-            var fileAlignment = File.OptionalHeader.FileAlignment;
-            var nextRVA = AlignSectionRVA(lastSection.RVA + lastSection.VirtualSize, sectionAlignment);
+            if (targetIATRVA == 0 || targetILTRVA == 0) {
+                Logger.Warn("PE file does not import from 'Minecraft.Windows', skipping patch.");
+                return false;
+            }
+
+            // Map import names to their target RVAs
+            Dictionary<string, uint> importNameToTarget = [];
+            List<AbstractSymbol> symbolsToWrite = [];
+            var targetILTReader = File.CreateReaderAtRva(targetILTRVA);
+            var targetIATReader = File.CreateReaderAtRva(targetIATRVA);
+            uint index = 0;
+            while (true) {
+                ulong iltEntry = targetILTReader.ReadUInt64();
+                if (iltEntry == 0)
+                    break;
+                index++;
+                ulong iatEntry = targetIATReader.ReadUInt64();
+                bool isOrdinal = (iltEntry & 0x8000000000000000) != 0;
+                if (isOrdinal) {
+                    continue;
+                }
+                uint hintNameRVA = (uint)(iltEntry & 0x7FFFFFFFFFFFFFFF);
+                var hintNameReader = File.CreateReaderAtRva(hintNameRVA);
+                ushort hint = hintNameReader.ReadUInt16();
+                string name = hintNameReader.ReadAsciiString();
+                var symbol = Symbols.OfType<AbstractPESymbol>().FirstOrDefault(s => s.Name == name);
+                if (symbol is null)
+                    continue;
+                uint entryRVA = targetIATReader.Rva - 8;
+                importNameToTarget[name] = entryRVA;
+                symbol.TargetOffset = entryRVA;
+                symbolsToWrite.Add(symbol);
+                Logger.Debug($"Mapping import {name} to target RVA 0x{entryRVA:X}...");
+            }
+
+            foreach (var s in Symbols.Where(s => s.IsShadowSymbol && !symbolsToWrite.Contains(s))) {
+                symbolsToWrite.Add(s);
+                Logger.Debug($"Mapping shadow symbol {s.Name}...");
+            }
+            symbolsToWrite.AddRange(Symbols.Where(s => s.IsShadowSymbol && !symbolsToWrite.Contains(s)));
+            Logger.Info($"Mapped {symbolsToWrite.Count} symbols to import targets.");
 
             // Create the RTIH section
-            PESection rtihSection = File.AddSection(SectionRTIH, nextRVA);
-            rtihSection.Characteristics = SectionCharacteristics.ContainsInitializedData | SectionCharacteristics.MemRead;
-            var rthiStream = new PEStreamSectionData();
-
-            var header = new PEImporterHeader() {
-                Format = HeaderFormat.PE,
-                Version = 1,
-                Symbols = Symbols
-            };
-            using var writer = new BinaryWriter(rthiStream.Stream, Encoding.UTF8, true);
-            header.Write(context, writer);
-            rtihSection.Content.Add(rthiStream);
-
-            // Remove the target import directory entry from the import directory
-            importDirectory.Entries.Remove(targetImportDirectoryEntry);
-            DiagnosticBag diags = new() { EnableStackTrace = true };
-            File.Verify(diags);
-            foreach (var diag in diags.Messages) {
-                switch (diag.Kind) {
-                    case DiagnosticKind.Error:
-                        Logger.Error(diag.ToString());
-                        break;
-                    case DiagnosticKind.Warning:
-                        Logger.Warn(diag.ToString());
-                        break;
-                    default:
-                        Logger.Info(diag.ToString());
-                        break;
-                }
+            {
+                PESection rtihSec = new(SectionRTIH, SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
+                using var ms = new MemoryStream();
+                using var writer = new BinaryWriter(ms, Encoding.UTF8);
+                var header = new PEImporterHeader() {
+                    Symbols = symbolsToWrite,
+                    OldIDT = importDirectory.VirtualAddress,
+                    OldIDTSize = importDirectory.Size,
+                    ImportCount = index
+                };
+                header.WriteTo(writer);
+                var data = new DataSegment(ms.ToArray());
+                rtihSec.Contents = data;
+                File.Sections.Add(rtihSec);
+                File.AlignSections();
             }
-            Logger.Debug("Removed import from 'Minecraft.Windows.exe'.");
-            Logger.Debug("Patching completed.");
+
+            // Create new NIDT section
+            {
+                PESection nidtSec = new(SectionNIDT, SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
+                using var ms = new MemoryStream();
+                using var writer = new BinaryWriter(ms, Encoding.UTF8);
+                foreach (var entry in importDescriptors) {
+                    if (entry.OriginalFirstThunk == targetIATRVA || entry.FirstThunk == targetILTRVA)
+                        continue;
+                    entry.Write(writer);
+                }
+                var data = new DataSegment(ms.ToArray());
+                nidtSec.Contents = data;
+                File.Sections.Add(nidtSec);
+                File.AlignSections();
+
+                // Update import directory to point to new NIDT
+                File.OptionalHeader.SetDataDirectory(DataDirectoryIndex.ImportDirectory, new DataDirectory(nidtSec.Rva, data.GetVirtualSize()));
+            }
+
+            File.UpdateHeaders();
+            Logger.Info("PE file patched successfully.");
             return true;
         }
 
@@ -125,6 +156,33 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                 return File.Sections.Remove(section);
             }
             return false;
+        }
+
+        public bool Unpatch() {
+            for (int i = File.Sections.Count - 1; i >= 0; i--) {
+                var section = File.Sections[i]!;
+                if (section.Name == SectionRTIH) {
+                    using var reader = section.CreateReader().ToReader();
+                    var type = AbstractHeader.PeekInfo(reader);
+                    var header = HeaderFactory.Create(type);
+                    header.ReadFrom(reader);
+
+                    if (header is not AbstractPEImporterHeader peHeader) {
+                        Logger.Warn($"RTIH section does not contain a valid PE Importer Header, cannot unpatch.");
+                        return false;
+                    }
+
+                    // Restore the old import directory
+                    File.OptionalHeader.SetDataDirectory(DataDirectoryIndex.ImportDirectory, new DataDirectory(peHeader.OldIDT, peHeader.OldIDTSize));
+                }
+
+                if (IsCustomSection(section.Name)) {
+                    Logger.Debug($"Removing custom section '{section.Name}'...");
+                    File.Sections.RemoveAt(i);
+                }
+            }
+            File.AlignSections();
+            return true;
         }
     }
 }

@@ -9,7 +9,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             var kind = variable.IsFreeVariable ? "Free Variable" : "Variable";
             Logger.Debug($"{kind}: {variable.FullName}, Imported: {variable.IsImported}, Static: {variable.IsStatic}");
             if (variable.Location is not null && !string.IsNullOrEmpty(variable.Location.File))
-                Logger.Debug($"   at {Path.GetRelativePath(inputDir, variable.Location.File)}:{variable.Location.Line}:{variable.Location.Column}:{variable.Location.Offset}");
+                Logger.Debug($"   at {Path.GetRelativePath(inputDir, variable.Location.File)}:{variable.Location.Line}:{variable.Location.Column}");
         }
 
         public static void PrintMethod(ASTMethod method, string inputDir)
@@ -17,7 +17,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             var kind = method.IsFreeFunction ? "Free Function" : "Method";
             Logger.Debug($"{kind}: {method.FullName}, Virtual: {method.IsVirtual}, Imported: {method.IsImported}");
             if (method.Location is not null && !string.IsNullOrEmpty(method.Location.File))
-                Logger.Debug($"   at {Path.GetRelativePath(inputDir, method.Location.File)}:{method.Location.Line}:{method.Location.Column}:{method.Location.Offset}");
+                Logger.Debug($"   at {Path.GetRelativePath(inputDir, method.Location.File)}:{method.Location.Line}:{method.Location.Column}");
         }
 
         public static void PrintClass(ASTClass cls, string inputDir)
@@ -31,7 +31,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             if (!string.IsNullOrEmpty(cls.Namespace))
                 Logger.Debug($"  FullName: {cls.FullName}");
             if (cls.Location != null)
-                Logger.Debug($"  Location: {Path.GetRelativePath(inputDir, cls.Location.File)}:{cls.Location.Line}:{cls.Location.Column}:{cls.Location.Offset}");
+                Logger.Debug($"  Location: {Path.GetRelativePath(inputDir, cls.Location.File)}:{cls.Location.Line}:{cls.Location.Column}");
 
             // Print methods
             foreach (var method in cls.Methods)

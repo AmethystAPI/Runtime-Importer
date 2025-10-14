@@ -11,7 +11,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="LibObjectFile" Version="2.1.0" />
+    <PackageReference Include="AsmResolver" Version="5.5.1" />
+    <PackageReference Include="AsmResolver.PE" Version="5.5.1" />
+    <PackageReference Include="AsmResolver.PE.File" Version="5.5.1" />
   </ItemGroup>
 
   <ItemGroup>

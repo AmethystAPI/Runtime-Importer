@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Runtime.InteropServices;
 
-namespace Amethyst.ModuleTweaker.Patching.PE
-{
+namespace Amethyst.ModuleTweaker.Patching.PE {
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct ImportDescriptor()
     {
@@ -32,8 +26,8 @@ namespace Amethyst.ModuleTweaker.Patching.PE
 
         public static ImportDescriptor Read(BinaryReader reader)
         {
-            var bytes = reader.ReadBytes((int)Size);
-            if (bytes.Length != Size)
+            Span<byte> bytes = stackalloc byte[(int)Size];
+            if (reader.Read(bytes) != Size)
                 throw new ArgumentException("Not enough data to read ImportDescriptor.");
             return MemoryMarshal.Read<ImportDescriptor>(bytes);
         }

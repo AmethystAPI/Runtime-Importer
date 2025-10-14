@@ -1,12 +1,11 @@
 ﻿using Amethyst.Common.Diagnostics;
 using Amethyst.Common.Models;
 using Amethyst.ModuleTweaker.Patching;
-using Amethyst.ModuleTweaker.Patching.PE;
-using Amethyst.ModuleTweaker.Patching.Symbols;
+using AsmResolver.PE.File;
+using AsmResolver.PE.Imports;
 using CliFx;
 using CliFx.Attributes;
 using CliFx.Infrastructure;
-using LibObjectFile.PE;
 using Newtonsoft.Json;
 using System.Globalization;
 
@@ -24,14 +23,14 @@ namespace Amethyst.ModuleTweaker.Commands
         public ValueTask ExecuteAsync(IConsole console)
         {
             FileInfo module = new(ModulePath);
-            DirectoryInfo symbols = new(SymbolsPath);
+            DirectoryInfo symbolsDir = new(SymbolsPath);
             if (module.Exists is false)
             {
                 Logger.Warn("Couldn't patch module, specified module does not exist.");
                 return default;
             }
 
-            if (symbols.Exists is false)
+            if (symbolsDir.Exists is false)
             {
                 Logger.Warn("Couldn't patch module, specified symbols directory does not exist.");
                 return default;
@@ -48,9 +47,12 @@ namespace Amethyst.ModuleTweaker.Commands
                 return addr;
             }
 
+            //SymbolFactory.Register(new SymbolType(1, "function"), () => new PEFunctionSymbol());
+            HeaderFactory.Register(new HeaderType(1, "pe32+"), (args) => new Patching.PE.V1.PEImporterHeader());
+
             // Collect all symbol files and accumulate mangled names
-            IEnumerable<FileInfo> symbolFiles = symbols.EnumerateFiles("*.json", SearchOption.AllDirectories);
-            List<ImportedSymbol> importedSymbols = [];
+            IEnumerable<FileInfo> symbolFiles = symbolsDir.EnumerateFiles("*.json", SearchOption.AllDirectories);
+            List<AbstractSymbol> symbols = [];
             foreach (var symbolFile in symbolFiles)
             {
                 using var stream = symbolFile.OpenRead();
@@ -61,12 +63,10 @@ namespace Amethyst.ModuleTweaker.Commands
                     switch (symbolJson.FormatVersion)
                     {
                         case 1:
-                            foreach (var function in symbolJson.Functions)
-                            {
+                            foreach (var function in symbolJson.Functions) {
                                 if (string.IsNullOrEmpty(function.Name))
                                     continue;
-
-                                importedSymbols.Add(new FunctionSymbol {
+                                symbols.Add(new Patching.PE.V1.PEFunctionSymbol {
                                     Name = function.Name,
                                     IsVirtual = false,
                                     IsSignature = function.Signature is not null,
@@ -74,33 +74,32 @@ namespace Amethyst.ModuleTweaker.Commands
                                     Signature = function.Signature ?? string.Empty
                                 });
                             }
-                            foreach (var variable in symbolJson.Variables)
-                            {
-                                if (string.IsNullOrEmpty(variable.Name))
-                                    continue;
-                                importedSymbols.Add(new VariableSymbol {
-                                    Name = variable.Name,
-                                    Address = ParseAddress(variable.Address)
-                                });
-                            }
-                            foreach (var vtable in symbolJson.VirtualTables)
-                            {
-                                if (string.IsNullOrEmpty(vtable.Name))
-                                    continue;
-                                importedSymbols.Add(new VirtualPointerSymbol {
-                                    Name = vtable.Name,
-                                    Address = ParseAddress(vtable.Address)
-                                });
-                            }
-                            foreach (var vfunc in symbolJson.VirtualFunctions)
-                            {
+                            foreach (var vfunc in symbolJson.VirtualFunctions) {
                                 if (string.IsNullOrEmpty(vfunc.Name))
                                     continue;
-                                importedSymbols.Add(new FunctionSymbol {
+                                symbols.Add(new Patching.PE.V1.PEFunctionSymbol {
                                     Name = vfunc.Name,
                                     IsVirtual = true,
                                     VirtualIndex = vfunc.Index,
                                     VirtualTable = vfunc.VirtualTable ?? "this"
+                                });
+                            }
+                            foreach (var variable in symbolJson.Variables) {
+                                if (string.IsNullOrEmpty(variable.Name))
+                                    continue;
+                                symbols.Add(new Patching.PE.V1.PEDataSymbol {
+                                    Name = variable.Name,
+                                    IsVirtualTable = false,
+                                    Address = ParseAddress(variable.Address)
+                                });
+                            }
+                            foreach (var vtable in symbolJson.VirtualTables) {
+                                if (string.IsNullOrEmpty(vtable.Name))
+                                    continue;
+                                symbols.Add(new Patching.PE.V1.PEDataSymbol {
+                                    Name = vtable.Name,
+                                    IsVirtualTable = true,
+                                    Address = ParseAddress(vtable.Address)
                                 });
                             }
                             break;
@@ -111,15 +110,12 @@ namespace Amethyst.ModuleTweaker.Commands
             try
             {
                 // Patch the module
-                using var str = File.Open(ModulePath, FileMode.Open, FileAccess.ReadWrite);
-                var file = PEFile.Read(str, new PEImageReaderOptions { EnableStackTrace = true });
-                var patcher = new PEPatcher(file, importedSymbols);
+                var file = PEFile.FromFile(ModulePath);
+                var patcher = new Patching.PE.PEPatcher(file, symbols);
                 if (patcher.Patch())
                 {
-                    using var copyStr = File.Create(ModulePath + ".backup");
-                    str.Seek(0, SeekOrigin.Begin);
-                    str.CopyTo(copyStr);
-                    file.Write(str);
+                    File.Copy(ModulePath, ModulePath + ".bak", true);
+                    file.Write(ModulePath);
                 }
             }
             catch (Exception ex)

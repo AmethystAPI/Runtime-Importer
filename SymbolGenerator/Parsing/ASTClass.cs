@@ -1,4 +1,5 @@
-﻿using Amethyst.SymbolGenerator.Parsing.Annotations;
+﻿using Amethyst.Common.Utility;
+using Amethyst.SymbolGenerator.Parsing.Annotations;
 
 namespace Amethyst.SymbolGenerator.Parsing
 {
@@ -6,7 +7,7 @@ namespace Amethyst.SymbolGenerator.Parsing
     {
         public string? Name { get; set; }
         public string? Namespace { get; set; }
-        public override ASTCursorLocation? Location { get; set; }
+        public override CursorLocation? Location { get; set; }
         public ASTBaseSpecifier[] DirectBaseClasses { get; set; } = [];
         public ASTMethod[] Methods { get; set; } = [];
         public ASTVariable[] Variables { get; set; } = [];

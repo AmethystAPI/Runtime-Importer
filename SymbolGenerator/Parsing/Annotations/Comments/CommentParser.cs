@@ -1,11 +1,12 @@
-﻿using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
+﻿using Amethyst.Common.Utility;
+using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
 using System.Text.RegularExpressions;
 
 namespace Amethyst.SymbolGenerator.Parsing.Annotations
 {
     public static partial class CommentParser
     {
-        public static IEnumerable<RawAnnotation> ParseAnnotations(AbstractAnnotationTarget target, string comment, ASTCursorLocation location)
+        public static IEnumerable<RawAnnotation> ParseAnnotations(AbstractAnnotationTarget target, string comment, CursorLocation location)
         {
             using var sr = new StringReader(comment);
             string? line;

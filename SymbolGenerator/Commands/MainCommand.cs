@@ -149,7 +149,7 @@ namespace Amethyst.SymbolGenerator.Commands
                         if (processed is null)
                             continue;
 
-                        if (processed.Target.Location is not { } location || location.File == "Unknown File")
+                        if (processed.Target.Location is not { } location || location.File == "<unknown>")
                         {
                             Logger.Warn($"Skipping annotation for '{processed.Target}' due to unknown location.");
                             continue;

@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using Amethyst.Common.Utility;
+using System.Reflection;
 
 namespace Amethyst.Common.Diagnostics
 {
@@ -10,43 +11,28 @@ namespace Amethyst.Common.Diagnostics
             Console.WriteLine(message);
             Console.ResetColor();
         }
-
-        public static void Info(object? message)
+        
+        public static void Info(object? message, CursorLocation? location = null)
         {
-            WriteLine($"{(
-                Assembly.GetEntryAssembly()?.GetName()?.Name is { } name ?
-                $"[{name}] " :
-                "")}[INFO] {message}", ConsoleColor.White);
+            WriteLine($"{(location is not null && location.File != "<unknown>" ? location.ToString() + ": " : (Assembly.GetEntryAssembly()?.GetName().Name is not string name ? "Unknown: " : name.Trim() + ": "))} message: {message}", ConsoleColor.White);
         }
 
-        public static void Debug(object? message)
+        public static void Debug(object? message, CursorLocation? location = null)
         {
 #if DEBUG
-            WriteLine($"{(
-                Assembly.GetEntryAssembly()?.GetName()?.Name is { } name ?
-                $"[{name}] " :
-                "")}[DEBUG] {message}", ConsoleColor.White);
+            WriteLine($"{(location is not null && location.File != "<unknown>" ? location.ToString() + ": " : (Assembly.GetEntryAssembly()?.GetName().Name is not string name ? "Unknown: " : name.Trim() + ": "))}message: {message}", ConsoleColor.White);
 #endif
         }
 
-        public static void Warn(string message) =>
-            WriteLine($"{(
-                Assembly.GetEntryAssembly()?.GetName()?.Name is { } name ?
-                $"[{name}] " :
-                "")}[WARN] {message}", ConsoleColor.Yellow);
+        public static void Warn(string message, CursorLocation? location = null) =>
+            WriteLine($"{(location is not null && location.File != "<unknown>" ? location?.ToString() + ": " : (Assembly.GetEntryAssembly()?.GetName().Name is not string name ? "Unknown: " : name.Trim() + ": "))}warning: {message}", ConsoleColor.Yellow);
 
-        public static void Error(string message) =>
-            WriteLine($"{(
-                Assembly.GetEntryAssembly()?.GetName()?.Name is { } name ?
-                $"[{name}] " :
-                "")}[ERROR] {message}", ConsoleColor.Red);
+        public static void Error(string message, CursorLocation? location = null) =>
+            WriteLine($"{(location is not null && location.File != "<unknown>" ? location?.ToString() + ": " : (Assembly.GetEntryAssembly()?.GetName().Name is not string name ? "Unknown: " : name.Trim() + ": "))}error: {message}", ConsoleColor.Red);
 
-        public static void Fatal(string message)
+        public static void Fatal(string message, CursorLocation? location = null)
         {
-            WriteLine($"{(
-                Assembly.GetEntryAssembly()?.GetName()?.Name is { } name ?
-                $"[{name}] " :
-                "")}[FATAL] {message}", ConsoleColor.Magenta);
+            WriteLine($"{(location is not null && location.File != "<unknown>" ? location?.ToString() + ": " : (Assembly.GetEntryAssembly()?.GetName().Name is not string name ? "Unknown: " : name.Trim() + ": "))}fatal error: {message}", ConsoleColor.Magenta);
             Environment.Exit(1);
         }
     }
