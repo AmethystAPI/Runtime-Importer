@@ -6,6 +6,7 @@ using AsmResolver.PE.Imports;
 using CliFx;
 using CliFx.Attributes;
 using CliFx.Infrastructure;
+using K4os.Hash.xxHash;
 using Newtonsoft.Json;
 using System.Globalization;
 
@@ -14,27 +15,33 @@ namespace Amethyst.ModuleTweaker.Commands
     [Command(Description = "Patches or unpatches modules for runtime importing support.")]
     public class MainCommand : ICommand
     {
-        [CommandOption("module", 'm', Description = "The specified module path to patch.")]
+        [CommandOption("module", 'm', Description = "The specified module path to patch.", IsRequired = true)]
         public string ModulePath { get; set; } = null!;
 
-        [CommandOption("symbols", 's', Description = "Path to directory containing *.symbols.json to use for patching.")]
+        [CommandOption("symbols", 's', Description = "Path to directory containing *.symbols.json to use for patching.", IsRequired = true)]
         public string SymbolsPath { get; set; } = null!;
+
+        [CommandOption("output", 'o', Description = "Path to save temporary files, don't confuse with -m.")]
+        public string OutputPath { get; set; } = null!;
 
         public ValueTask ExecuteAsync(IConsole console)
         {
             FileInfo module = new(ModulePath);
             DirectoryInfo symbolsDir = new(SymbolsPath);
-            if (module.Exists is false)
-            {
-                Logger.Warn("Couldn't patch module, specified module does not exist.");
+            if (module.Exists is false) {
+                Logger.Fatal("Couldn't patch module, specified module does not exist.");
                 return default;
             }
 
-            if (symbolsDir.Exists is false)
-            {
-                Logger.Warn("Couldn't patch module, specified symbols directory does not exist.");
+            if (symbolsDir.Exists is false) {
+                Logger.Fatal("Couldn't patch module, specified symbols directory does not exist.");
                 return default;
             }
+
+            if (string.IsNullOrEmpty(OutputPath)) {
+                OutputPath = Path.GetFullPath(Path.Combine(SymbolsPath, "../"));
+            }
+            DirectoryInfo outDir = new(OutputPath);
 
             ulong ParseAddress(string? address)
             {
@@ -111,12 +118,35 @@ namespace Amethyst.ModuleTweaker.Commands
             try
             {
                 // Patch the module
-                var file = PEFile.FromFile(ModulePath);
-                var patcher = new Patching.PE.PEPatcher(file, symbols);
+                var bytes = File.ReadAllBytes(ModulePath);
+                ulong hash = XXH64.DigestOf(bytes);
+                if (File.Exists(Path.Combine(outDir.FullName, "module_hash.txt"))) {
+                    var existingHash = File.ReadAllText(Path.Combine(outDir.FullName, "module_hash.txt"));
+                    if (ulong.TryParse(existingHash, NumberStyles.HexNumber, null, out var existingHashValue)) {
+                        if (existingHashValue == hash) {
+                            Logger.Info("Module hash matches previous hash, skipping patch.");
+                            return default;
+                        }
+                    }
+                }
+
+                var peFile = PEFile.FromBytes(bytes);
+                if (peFile is null) {
+                    Logger.Fatal("Failed to read module as a PE file.");
+                    return default;
+                }
+                Logger.Info($"Loaded module '{ModulePath}' as PE file.");
+                var patcher = new Patching.PE.PEPatcher(peFile, symbols);
+
                 if (patcher.Patch())
                 {
                     File.Copy(ModulePath, ModulePath + ".bak", true);
-                    file.Write(ModulePath);
+                    using var ms = new MemoryStream();
+                    peFile.Write(ms);
+                    var newBytes = ms.ToArray();
+                    ulong newHash = XXH64.DigestOf(newBytes);
+                    File.WriteAllBytes(ModulePath, newBytes);
+                    File.WriteAllText(Path.Combine(outDir.FullName, "module_hash.txt"), newHash.ToString("X16"));
                 }
             }
             catch (Exception ex)
