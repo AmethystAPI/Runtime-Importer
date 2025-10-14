@@ -47,7 +47,8 @@ namespace Amethyst.ModuleTweaker.Commands
                 return addr;
             }
 
-            //SymbolFactory.Register(new SymbolType(1, "function"), () => new PEFunctionSymbol());
+            SymbolFactory.Register(new SymbolType(1, "pe32+", "data"), () => new Patching.PE.V1.PEDataSymbol());
+            SymbolFactory.Register(new SymbolType(1, "pe32+", "function"), () => new Patching.PE.V1.PEFunctionSymbol());
             HeaderFactory.Register(new HeaderType(1, "pe32+"), (args) => new Patching.PE.V1.PEImporterHeader());
 
             // Collect all symbol files and accumulate mangled names

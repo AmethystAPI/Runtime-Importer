@@ -44,7 +44,8 @@ namespace Amethyst.ModuleTweaker.Patching {
                 uint ver = reader.ReadUInt32();
                 string fmt = reader.ReadPrefixedString();
                 string kind = reader.ReadPrefixedString();
-                return new(ver, fmt, kind);
+                string name = reader.ReadPrefixedString();
+                return new(ver, fmt, kind, name);
             } finally {
                 reader.BaseStream.Position = initialPos;
             }

@@ -5,8 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Amethyst.ModuleTweaker.Patching {
-    public class SymbolInfo(uint version, string kind, string name) {
-        public SymbolType Type => new(version, kind);
+    public class SymbolInfo(uint version, string format, string kind, string name) {
+        public SymbolType Type => new(version, format, kind);
         public string Name { get; set; } = name;
 
         public override bool Equals(object? obj) {
