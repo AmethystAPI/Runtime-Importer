@@ -223,10 +223,11 @@ namespace Amethyst.SymbolGenerator.Parsing
             return file.StartsWith(InputDirectory, StringComparison.Ordinal) && StrictHeaders.Contains(file);
         }
 
-        private (List<CXCursor> methods, List<CXCursor> vars, List<CXCursor> bases) CollectClassMembers(CXCursor cursor)
+        private (List<CXCursor> methods, List<CXCursor> vars, List<CXCursor> classes, List<CXCursor> bases) CollectClassMembers(CXCursor cursor)
         {
             var methods = new List<CXCursor>();
             var vars = new List<CXCursor>();
+            var classes = new List<CXCursor>();
             var bases = new List<CXCursor>();
 
             unsafe
@@ -249,12 +250,16 @@ namespace Amethyst.SymbolGenerator.Parsing
                         case CXCursorKind.CXCursor_CXXBaseSpecifier:
                             bases.Add(c);
                             break;
+                        case CXCursorKind.CXCursor_ClassDecl:
+                        case CXCursorKind.CXCursor_StructDecl:
+                            classes.Add(c);
+                            break;
                     }
                     return CXChildVisitResult.CXChildVisit_Continue;
                 }, new CXClientData(nint.Zero));
             }
 
-            return (methods, vars, bases);
+            return (methods, vars, classes, bases);
         }
 
         public ASTClass[] GetClasses()
@@ -415,7 +420,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             CursorLocation? location = GetLocation(cursor);
 
             // Collect members
-            var (methodsCursors, variableCursors, baseCursors) = CollectClassMembers(cursor);
+            var (methodsCursors, variableCursors, classesCursors, baseCursors) = CollectClassMembers(cursor);
 
             // Find base classes
             List<ASTBaseSpecifier> baseClasses = [.. baseCursors
@@ -424,7 +429,7 @@ namespace Amethyst.SymbolGenerator.Parsing
                     bool isVirtualBase = c.IsVirtualBase;
                     CXType type = c.Type;
                     CXCursor decl = type.Declaration;
-                    ASTClass? classInfo = VisitClass(decl, decl.SemanticParent, decl.Usr.ToString()).rawClass;
+                    ASTClass? classInfo = VisitClass(decl, decl.SemanticParent, GetUsr(decl)).rawClass;
                     return classInfo is not null ? new ASTBaseSpecifier()
                     {
                         Class = classInfo,
@@ -435,12 +440,17 @@ namespace Amethyst.SymbolGenerator.Parsing
 
             // Find methods
             List<ASTMethod> methods = [.. methodsCursors
-                .Select(c => VisitMethod(c, cursor, c.Usr.ToString()).method
+                .Select(c => VisitMethod(c, cursor, GetUsr(c)).method
             ).Where(t => t is not null)!];
 
             // Find variables
             List<ASTVariable> variables = [.. variableCursors
-                .Select(c => VisitVariable(c, cursor, c.Usr.ToString()).variable
+                .Select(c => VisitVariable(c, cursor, GetUsr(c)).variable
+            ).Where(t => t is not null)!];
+
+            // Find nested classes
+            List<ASTClass> nestedClasses = [.. classesCursors
+                .Select(c => VisitClass(c, cursor, GetUsr(c)).rawClass
             ).Where(t => t is not null)!];
 
             ASTClass rawClass = new()
@@ -474,7 +484,7 @@ namespace Amethyst.SymbolGenerator.Parsing
                 if (overriden.Length > 0)
                 {
                     var first = overriden[0];
-                    var (_, overrideOfMethod) = VisitMethod(first, first.SemanticParent, first.Usr.ToString());
+                    var (_, overrideOfMethod) = VisitMethod(first, first.SemanticParent, GetUsr(first));
                     overrideOf = overrideOfMethod;
                 }
             }
