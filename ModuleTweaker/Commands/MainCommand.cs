@@ -89,7 +89,8 @@ namespace Amethyst.ModuleTweaker.Commands
                                     Name = vfunc.Name,
                                     IsVirtual = true,
                                     VirtualIndex = vfunc.Index,
-                                    VirtualTable = vfunc.VirtualTable ?? "this"
+                                    VirtualTable = vfunc.VirtualTable ?? "this",
+                                    IsDestructor = vfunc.IsVirtualDestructor
                                 });
                             }
                             foreach (var variable in symbolJson.Variables) {
@@ -98,7 +99,8 @@ namespace Amethyst.ModuleTweaker.Commands
                                 symbols.Add(new Patching.PE.V1.PEDataSymbol {
                                     Name = variable.Name,
                                     IsVirtualTable = false,
-                                    Address = ParseAddress(variable.Address)
+                                    Address = ParseAddress(variable.Address),
+                                    IsVirtualTableAddress = variable.IsVirtualTableAddress
                                 });
                             }
                             foreach (var vtable in symbolJson.VirtualTables) {

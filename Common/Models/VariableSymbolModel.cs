@@ -14,5 +14,8 @@ namespace Amethyst.Common.Models
 
         [JsonProperty("address")]
         public string Address { get; set; } = string.Empty;
+
+        [JsonProperty("is_vaddress")]
+        public bool IsVirtualTableAddress { get; set; } = false;
     }
 }

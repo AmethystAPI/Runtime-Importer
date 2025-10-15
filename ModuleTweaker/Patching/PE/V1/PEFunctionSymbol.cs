@@ -12,6 +12,7 @@ namespace Amethyst.ModuleTweaker.Patching.PE.V1 {
 
         public override bool IsShadowSymbol => false;
 
+        public bool IsDestructor { get; set; } = false;
         public bool IsVirtual { get; set; } = false;
         public uint VirtualIndex { get; set; } = 0;
         public string VirtualTable { get; set; } = string.Empty;
@@ -21,13 +22,14 @@ namespace Amethyst.ModuleTweaker.Patching.PE.V1 {
 
         public override void ReadFrom(BinaryReader reader) {
             base.ReadFrom(reader);
-            IsVirtual = reader.ReadBoolean();
+            IsDestructor = reader.ReadByte() != 0;
+            IsVirtual = reader.ReadByte() != 0;
             if (IsVirtual) {
                 VirtualIndex = reader.ReadUInt32();
                 VirtualTable = reader.ReadPrefixedString();
             }
             else {
-                IsSignature = reader.ReadBoolean();
+                IsSignature = reader.ReadByte() != 0;
                 if (IsSignature)
                     Signature = reader.ReadPrefixedString();
                 else
@@ -37,13 +39,14 @@ namespace Amethyst.ModuleTweaker.Patching.PE.V1 {
 
         public override void WriteTo(BinaryWriter writer) {
             base.WriteTo(writer);
-            writer.Write(IsVirtual);
+            writer.Write((byte)(IsDestructor ? 1 : 0));
+            writer.Write((byte)(IsVirtual ? 1 : 0));
             if (IsVirtual) {
                 writer.Write(VirtualIndex);
                 writer.WritePrefixedString(VirtualTable);
             }
             else {
-                writer.Write(IsSignature);
+                writer.Write((byte)(IsSignature ? 1 : 0));
                 if (IsSignature)
                     writer.WritePrefixedString(Signature);
                 else

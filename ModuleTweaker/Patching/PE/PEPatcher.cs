@@ -94,7 +94,7 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                 var symbol = Symbols.OfType<AbstractPESymbol>().FirstOrDefault(s => s.Name == name);
                 if (symbol is null)
                     continue;
-                uint entryRVA = targetIATReader.Rva - 8;
+                uint entryRVA = targetILTRVA + ((index - 1) * 8);
                 importNameToTarget[name] = entryRVA;
                 symbol.TargetOffset = entryRVA;
                 symbolsToWrite.Add(symbol);
