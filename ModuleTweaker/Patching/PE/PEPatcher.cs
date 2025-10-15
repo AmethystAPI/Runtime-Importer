@@ -109,6 +109,7 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
             }
             Logger.Info($"Mapped {symbolsToWrite.Count} symbols to import targets.");
 
+            uint rtisRealSize = 0;
             // Create the RTIS section
             {
                 PESection rtisSec = new(SectionRTIS, SectionFlags.ContentInitializedData | SectionFlags.MemoryRead | SectionFlags.MemoryWrite | SectionFlags.MemoryExecute);
@@ -123,11 +124,14 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                         }
                     }
                 }
-                var data = new DataSegment(ms.ToArray());
+                byte[] msData = ms.ToArray();
+                rtisRealSize = (uint)msData.Length;
+                var data = new DataSegment(msData);
                 rtisSec.Contents = data;
                 File.Sections.Add(rtisSec);
                 File.AlignSections();
             }
+            Logger.Info($"Generated storage for {symbolsToWrite.Count(s => (s is AbstractPESymbol peSym) && peSym.HasStorage)} symbols, total size 0x{rtisRealSize:X} bytes.");
 
             // Update storage offsets to be section-relative
             uint rtisRVA = File.Sections.First(s => s.Name == SectionRTIS).Rva;
@@ -141,6 +145,7 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                 }
             }
 
+            uint rtihRealSize = 0;
             // Create the RTIH section
             {
                 PESection rtihSec = new(SectionRTIH, SectionFlags.ContentInitializedData | SectionFlags.MemoryRead);
@@ -153,11 +158,14 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                     ImportCount = index
                 };
                 header.WriteTo(writer);
-                var data = new DataSegment(ms.ToArray());
+                byte[] msData = ms.ToArray();
+                rtihRealSize = (uint)msData.Length;
+                var data = new DataSegment(msData);
                 rtihSec.Contents = data;
                 File.Sections.Add(rtihSec);
                 File.AlignSections();
             }
+            Logger.Info($"Mapped {symbolsToWrite.Count} symbols, total size 0x{rtisRealSize:X} bytes.");
 
             // Create new NIDT section
             {
