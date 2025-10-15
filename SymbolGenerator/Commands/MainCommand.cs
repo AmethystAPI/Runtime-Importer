@@ -159,13 +159,6 @@ namespace Amethyst.SymbolGenerator.Commands
                             annotationsData[location.File] = [];
                         annotationsData[location.File].Add(processed.Data);
 
-                        //if (processed.Data is FunctionSymbolModel function && processed.Target is ASTMethod method)
-                        //{
-                        //    if (method.IsConstructor) {
-
-                        //    }
-                        //}
-
                         if (processed.Data is VirtualTableSymbolModel vtable && processed.Target is ASTClass cls)
                         {
                             // Create helper symbol $vtable_for_X$ for virtual tables
