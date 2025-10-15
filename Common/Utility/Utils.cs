@@ -59,5 +59,24 @@ namespace Amethyst.Common.Utility
             sb.AppendLine("; End of generated file.");
             File.WriteAllText(defFile, sb.ToString());
         }
+
+        public static void WritePrefixedString(this BinaryWriter writer, string str) {
+            byte[] bytes = Encoding.UTF8.GetBytes(str);
+            writer.Write(bytes.Length);
+            writer.Write(bytes);
+        }
+
+        public static string ReadPrefixedString(this BinaryReader reader) {
+            int length = reader.ReadInt32();
+            byte[] bytes = reader.ReadBytes(length);
+            return Encoding.UTF8.GetString(bytes);
+        }
+
+        public static void Align(this BinaryWriter writer, int alignment = 16, byte pad = 0x00) {
+            long pos = writer.BaseStream.Position;
+            int padding = (int)((alignment - (pos % alignment)) % alignment);
+            for (int i = 0; i < padding; i++)
+                writer.Write(pad);
+        }
     }
 }

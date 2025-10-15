@@ -23,5 +23,8 @@ namespace Amethyst.Common.Models
 
         [JsonProperty("index")]
         public uint Index { get; set; } = 0;
+
+        [JsonProperty("is_vdtor")]
+        public bool IsVirtualDestructor { get; set; } = false;
     }
 }

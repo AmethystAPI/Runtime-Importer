@@ -2,7 +2,7 @@
   "profiles": {
     "ModuleTweaker": {
       "commandName": "Project",
-      "commandLineArgs": "-m \"C:\\Users\\bravo\\AppData\\Local\\Packages\\Microsoft.MinecraftUWP_8wekyb3d8bbwe\\LocalState\\games\\com.mojang\\amethyst\\mods\\AmethystRuntime@2.0.0\\AmethystRuntime.dll\"\r\n-s \"C:\\Users\\bravo\\Documents\\GitHub\\Amethyst\\generated\\symbols\""
+      "commandLineArgs": "-m \"./input/Amethyst-Runtime.dll\"\r\n-s \"./output/symbols\""
     }
   }
 }

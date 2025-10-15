@@ -1,4 +1,5 @@
-﻿using Amethyst.SymbolGenerator.Parsing.Annotations;
+﻿using Amethyst.Common.Utility;
+using Amethyst.SymbolGenerator.Parsing.Annotations;
 
 namespace Amethyst.SymbolGenerator.Parsing
 {
@@ -8,7 +9,7 @@ namespace Amethyst.SymbolGenerator.Parsing
         public string MangledName { get; set; } = string.Empty;
         public string? Namespace { get; set; } = null;
         public ASTClass? DeclaringClass { get; set; } = null;
-        public override ASTCursorLocation? Location { get; set; } = null;
+        public override CursorLocation? Location { get; set; } = null;
         public bool IsImported { get; set; } = false;
         public string? RawComment { get; set; } = null;
         public bool IsStatic { get; set; } = false;

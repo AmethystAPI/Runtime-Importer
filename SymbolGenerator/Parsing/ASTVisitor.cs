@@ -1,5 +1,6 @@
 ﻿using Amethyst.Common.Diagnostics;
 using Amethyst.Common.Extensions;
+using Amethyst.Common.Utility;
 using ClangSharp.Interop;
 using System.Linq;
 
@@ -9,7 +10,7 @@ namespace Amethyst.SymbolGenerator.Parsing
     {
         private readonly Dictionary<string, string> SpellingCache = [];
         private readonly Dictionary<string, string> MangleCache = [];
-        private readonly Dictionary<string, ASTCursorLocation> LocationCache = [];
+        private readonly Dictionary<string, CursorLocation> LocationCache = [];
         private readonly Dictionary<string, string> RawCommentCache = [];
         private readonly Dictionary<string, bool> IsImportedCache = [];
         private readonly Dictionary<string, string> FullNamespaceCache = [];
@@ -64,7 +65,7 @@ namespace Amethyst.SymbolGenerator.Parsing
                 return false;
             foreach (var diag in GetDiagnostics())
             {
-                Action<string>? log = diag.Severity switch
+                Action<string, CursorLocation?>? log = diag.Severity switch
                 {
                     CXDiagnosticSeverity.CXDiagnostic_Error => Logger.Error,
                     CXDiagnosticSeverity.CXDiagnostic_Fatal => Logger.Error,
@@ -75,16 +76,16 @@ namespace Amethyst.SymbolGenerator.Parsing
                 var location = diag.Location;
                 location.GetFileLocation(out var file, out var line, out var column, out var offset);
                 string filePath = file.ToString() ?? "Unknown file";
-                string message = diag.Format(CXDiagnostic.DefaultDisplayOptions).ToString() ?? "Unknown diagnostic message";
-                log($"{filePath}({line},{column}): {message}");
+                string message = diag.Spelling.ToString() ?? "Unknown diagnostic message";
+                log(message, new(filePath, line, column));
             }
             return true;
         }
         #endregion
 
-        public string GetUsr(CXCursor cursor)
+        public static string GetUsr(CXCursor cursor)
         {
-            return cursor.Usr.ToString() + cursor.IsDefinition;
+            return cursor.Usr.ToString() + "@" + cursor.IsDefinition;
         }
 
         public string GetSpelling(CXCursor cursor)
@@ -99,7 +100,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             return spelling;
         }
 
-        public ASTCursorLocation? GetLocation(CXCursor cursor)
+        public CursorLocation? GetLocation(CXCursor cursor)
         {
             string usr = GetUsr(cursor);
             if (LocationCache.TryGetValue(usr, out var cached))
@@ -111,7 +112,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             if (!string.IsNullOrEmpty(path))
                 path = Path.GetFullPath(path.ToString()).NormalizeSlashes();
 
-            var location = new ASTCursorLocation(path, line, column, offset);
+            var location = new CursorLocation(path, line, column);
 
             LocationCache[usr] = location;
             return location;
@@ -416,7 +417,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             if (ClassCache.TryGetValue(usr, out var cached))
                 return (CXChildVisitResult.CXChildVisit_Continue, cached);
 
-            ASTCursorLocation? location = GetLocation(cursor);
+            CursorLocation? location = GetLocation(cursor);
 
             // Collect members
             var (methodsCursors, variableCursors, classesCursors, baseCursors) = CollectClassMembers(cursor);

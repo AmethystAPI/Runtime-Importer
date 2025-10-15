@@ -48,7 +48,8 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
                     Index = ParameterPack.Index,
                     VirtualTable = $"{target.DeclaringClass!.FullName}::vtable::'{ParameterPack.TargetVirtualTable}'",
                     Inherit = ParameterPack.ShouldInherit,
-                    Overrides = ParameterPack.ShouldInherit ? target.OverrideOf!.MangledName : null
+                    Overrides = ParameterPack.ShouldInherit ? target.OverrideOf!.MangledName : null,
+                    IsVirtualDestructor = target.IsDestructor
                 },
                 Resolve
             );

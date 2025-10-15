@@ -1,8 +1,10 @@
-﻿namespace Amethyst.SymbolGenerator.Parsing.Annotations
+﻿using Amethyst.Common.Utility;
+
+namespace Amethyst.SymbolGenerator.Parsing.Annotations
 {
     public abstract class AbstractAnnotationTarget
     {
-        public virtual ASTCursorLocation? Location { get; set; }
+        public virtual CursorLocation? Location { get; set; }
 
         public HashSet<ProcessedAnnotation> Annotations { get; set; } = [];
 
