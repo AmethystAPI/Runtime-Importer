@@ -90,7 +90,8 @@ namespace Amethyst.ModuleTweaker.Commands
                                     IsVirtual = true,
                                     VirtualIndex = vfunc.Index,
                                     VirtualTable = vfunc.VirtualTable ?? "this",
-                                    IsDestructor = vfunc.IsVirtualDestructor
+                                    IsDestructor = vfunc.IsVirtualDestructor,
+                                    HasStorage = vfunc.IsVirtualDestructor
                                 });
                             }
                             foreach (var variable in symbolJson.Variables) {
@@ -100,7 +101,8 @@ namespace Amethyst.ModuleTweaker.Commands
                                     Name = variable.Name,
                                     IsVirtualTable = false,
                                     Address = ParseAddress(variable.Address),
-                                    IsVirtualTableAddress = variable.IsVirtualTableAddress
+                                    IsVirtualTableAddress = variable.IsVirtualTableAddress,
+                                    HasStorage = variable.IsVirtualTableAddress
                                 });
                             }
                             foreach (var vtable in symbolJson.VirtualTables) {

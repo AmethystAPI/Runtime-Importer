@@ -168,7 +168,8 @@ namespace Amethyst.SymbolGenerator.Commands
                                 annotationsData[location.File].Add(new VariableSymbolModel
                                 {
                                     Name = mangled,
-                                    Address = vtable.Address
+                                    Address = vtable.Address,
+                                    IsVirtualTableAddress = true
                                 });
                             }
 
@@ -178,8 +179,7 @@ namespace Amethyst.SymbolGenerator.Commands
                                 annotationsData[location.File].Add(new VariableSymbolModel
                                 {
                                     Name = vtable.VtableMangledLabel,
-                                    Address = vtable.Address,
-                                    IsVirtualTableAddress = true
+                                    Address = vtable.Address
                                 });
                             }
                         }

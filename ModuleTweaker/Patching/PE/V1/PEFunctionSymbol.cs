@@ -7,6 +7,12 @@ using System.Threading.Tasks;
 
 namespace Amethyst.ModuleTweaker.Patching.PE.V1 {
     public class PEFunctionSymbol : AbstractPESymbol {
+        public static readonly byte[] VirtualDestructorDeletingDisableBlock = [
+            0x48, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, // mov rax, 0x1000000000000000
+            0x31, 0xD2,                                                 // xor edx, edx (sets delete flag to false)
+            0xFF, 0xE0                                                  // jmp rax
+        ];
+
         public override uint FormatVersion => 1;
         public override string Kind => "function";
 
@@ -52,6 +58,16 @@ namespace Amethyst.ModuleTweaker.Patching.PE.V1 {
                 else
                     writer.Write(Address);
             }
+        }
+
+        public override void SetStorage(BinaryWriter writer) {
+            if (!HasStorage)
+                throw new InvalidOperationException("Cannot set storage on a symbol without storage.");
+            if (!IsDestructor)
+                throw new InvalidOperationException("Cannot set storage on a non-destructor function symbol.");
+            writer.Align(16, 0x90); // Align to 16 bytes with NOPs
+            StorageOffset = (uint)writer.BaseStream.Position;
+            writer.Write(VirtualDestructorDeletingDisableBlock);
         }
     }
 }

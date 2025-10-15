@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Amethyst.Common.Utility;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -27,6 +28,14 @@ namespace Amethyst.ModuleTweaker.Patching.PE.V1 {
             IsVirtualTableAddress = reader.ReadByte() != 0;
             IsVirtualTable = reader.ReadByte() != 0;
             Address = reader.ReadUInt64();
+        }
+
+        public override void SetStorage(BinaryWriter writer) {
+            if (!HasStorage)
+                throw new InvalidOperationException("Cannot set storage on a symbol without storage.");
+            writer.Align(8, 0x00); // Align to 8 bytes with zeros
+            StorageOffset = (uint)writer.BaseStream.Position;
+            writer.Write(new byte[8]);
         }
     }
 }

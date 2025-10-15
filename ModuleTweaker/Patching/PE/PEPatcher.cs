@@ -10,10 +10,12 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
     public class PEPatcher(PEFile file, List<AbstractSymbol> symbols) : IPatcher {
         // Runtime Importer Header
         public const string SectionRTIH = ".rtih"; // Runtime Importer Header
+        public const string SectionRTIS = ".rtis"; // Runtime Importer Storage
         public const string SectionNIDT = ".nidt"; // New Import Directory Table
 
         public static HashSet<string> CustomSections { get; } = [
             SectionRTIH,
+            SectionRTIS,
             SectionNIDT
         ];
 
@@ -107,6 +109,37 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
             }
             symbolsToWrite.AddRange(Symbols.Where(s => s.IsShadowSymbol && !symbolsToWrite.Contains(s)));
             Logger.Info($"Mapped {symbolsToWrite.Count} symbols to import targets.");
+
+            // Create the RTIS section
+            {
+                PESection rtisSec = new(SectionRTIS, SectionFlags.ContentInitializedData | SectionFlags.MemoryRead | SectionFlags.MemoryWrite | SectionFlags.MemoryExecute);
+                using var ms = new MemoryStream();
+                using var writer = new BinaryWriter(ms, Encoding.UTF8);
+                foreach (var sym in symbolsToWrite) {
+                    if (sym is AbstractPESymbol peSym) {
+                        if (peSym.HasStorage) {
+                            peSym.SetStorage(writer);
+                            Logger.Debug($"Assigned storage offset 0x{peSym.StorageOffset:X} to symbol {peSym.Name}...");
+                        }
+                    }
+                }
+                var data = new DataSegment(ms.ToArray());
+                rtisSec.Contents = data;
+                File.Sections.Add(rtisSec);
+                File.AlignSections();
+            }
+
+            // Update storage offsets to be section-relative
+            uint rtisRVA = File.Sections.First(s => s.Name == SectionRTIS).Rva;
+            foreach (var sym in symbolsToWrite) {
+                if (sym is AbstractPESymbol peSym) {
+                    if (peSym.HasStorage) {
+                        // StorageOffset is RVO now, convert to RVA
+                        peSym.StorageOffset += rtisRVA;
+                        Logger.Debug($"Fixed up storage RVA to 0x{peSym.StorageOffset:X} for symbol {peSym.Name}...");
+                    }
+                }
+            }
 
             // Create the RTIH section
             {

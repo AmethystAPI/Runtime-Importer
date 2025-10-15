@@ -71,5 +71,12 @@ namespace Amethyst.Common.Utility
             byte[] bytes = reader.ReadBytes(length);
             return Encoding.UTF8.GetString(bytes);
         }
+
+        public static void Align(this BinaryWriter writer, int alignment = 16, byte pad = 0x00) {
+            long pos = writer.BaseStream.Position;
+            int padding = (int)((alignment - (pos % alignment)) % alignment);
+            for (int i = 0; i < padding; i++)
+                writer.Write(pad);
+        }
     }
 }
