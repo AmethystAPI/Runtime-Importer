@@ -107,7 +107,6 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                 symbolsToWrite.Add(s);
                 Logger.Debug($"Mapping shadow symbol {s.Name}...");
             }
-            Logger.Info($"Mapped {symbolsToWrite.Count} symbols to import targets.");
 
             uint rtisRealSize = 0;
             // Create the RTIS section
@@ -165,7 +164,7 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                 File.Sections.Add(rtihSec);
                 File.AlignSections();
             }
-            Logger.Info($"Mapped {symbolsToWrite.Count} symbols, total size 0x{rtisRealSize:X} bytes.");
+            Logger.Info($"Mapped {symbolsToWrite.Count} symbols, total size 0x{rtihRealSize:X} bytes.");
 
             // Create new NIDT section
             {
