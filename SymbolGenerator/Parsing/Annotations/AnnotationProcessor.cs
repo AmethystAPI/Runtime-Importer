@@ -47,7 +47,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn($"Failed to resolve annotation '{annotation}' at {annotation.Annotation.Location}: {ex.Message}");
+                    Logger.Warn($"Failed to resolve annotation '{annotation}': {ex.Message}", annotation.Annotation.Location);
                 }
             }
         }
@@ -71,12 +71,12 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations
             }
             catch (UnhandledAnnotationException ex) 
             {
-                Logger.Warn($"Skipping annotation '{annotation}' at {annotation.Location}: {ex.Message}");
+                Logger.Warn($"Skipping annotation '{annotation}': {ex.Message}", annotation.Location);
                 return;
             }
             catch (Exception ex) 
             {
-                Logger.Warn($"Skipping annotation '{annotation}' at {annotation.Location}: {ex.InnerException?.Message}");
+                Logger.Warn($"Skipping annotation '{annotation}': {ex.InnerException?.Message}", annotation.Location);
                 return;
             }
 
