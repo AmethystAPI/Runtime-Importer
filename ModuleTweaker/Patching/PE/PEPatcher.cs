@@ -107,7 +107,6 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                 symbolsToWrite.Add(s);
                 Logger.Debug($"Mapping shadow symbol {s.Name}...");
             }
-            symbolsToWrite.AddRange(Symbols.Where(s => s.IsShadowSymbol && !symbolsToWrite.Contains(s)));
             Logger.Info($"Mapped {symbolsToWrite.Count} symbols to import targets.");
 
             // Create the RTIS section
@@ -115,6 +114,7 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                 PESection rtisSec = new(SectionRTIS, SectionFlags.ContentInitializedData | SectionFlags.MemoryRead | SectionFlags.MemoryWrite | SectionFlags.MemoryExecute);
                 using var ms = new MemoryStream();
                 using var writer = new BinaryWriter(ms, Encoding.UTF8);
+                writer.Write(0ul); // Runtime state (8 bytes)
                 foreach (var sym in symbolsToWrite) {
                     if (sym is AbstractPESymbol peSym) {
                         if (peSym.HasStorage) {
