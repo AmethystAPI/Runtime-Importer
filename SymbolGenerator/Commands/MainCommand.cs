@@ -159,23 +159,29 @@ namespace Amethyst.SymbolGenerator.Commands
                             annotationsData[location.File] = [];
                         annotationsData[location.File].Add(processed.Data);
 
+                        //if (processed.Data is FunctionSymbolModel function && processed.Target is ASTMethod method)
+                        //{
+                        //    if (method.IsConstructor) {
+
+                        //    }
+                        //}
+
                         if (processed.Data is VirtualTableSymbolModel vtable && processed.Target is ASTClass cls)
                         {
                             // Create helper symbol $vtable_for_X$ for virtual tables
-                            {
-                                string[] reverseClassName = [.. cls.FullName.Split("::").Reverse(), ""];
-                                string mangled = $"?$vtable_for_{vtable.ForWhat.Replace("::", "$")}@{string.Join("@", reverseClassName)}@2_KA";
-                                annotationsData[location.File].Add(new VariableSymbolModel
-                                {
-                                    Name = mangled,
+                            foreach (var variable in cls.Variables.Where(v => v.MangledName.StartsWith($"?$vtable_for_{vtable.ForWhat.Replace("::", "$")}"))) {
+                                bool exists = processor.ProcessedAnnotations.Select(a => a.Data).OfType<VariableSymbolModel>().FirstOrDefault(v => v.Name == variable.MangledName) is not null;
+                                if (exists)
+                                    continue;
+                                annotationsData[location.File].Add(new VariableSymbolModel {
+                                    Name = variable.MangledName,
                                     Address = vtable.Address,
                                     IsVirtualTableAddress = true
                                 });
                             }
 
                             // Add vtable symbol so MSVC keeps being happy
-                            if (vtable.VtableMangledLabel is not null)
-                            {
+                            if (vtable.VtableMangledLabel is not null) {
                                 annotationsData[location.File].Add(new VariableSymbolModel
                                 {
                                     Name = vtable.VtableMangledLabel,
