@@ -55,6 +55,7 @@ namespace Amethyst.ModuleTweaker.Commands
             }
 
             SymbolFactory.Register(new SymbolType(1, "pe32+", "data"), () => new Patching.PE.V1.PEDataSymbol());
+            SymbolFactory.Register(new SymbolType(2, "pe32+", "data"), () => new Patching.PE.V2.PEDataSymbol());
             SymbolFactory.Register(new SymbolType(1, "pe32+", "function"), () => new Patching.PE.V1.PEFunctionSymbol());
             HeaderFactory.Register(new HeaderType(1, "pe32+"), (args) => new Patching.PE.V1.PEImporterHeader());
 
@@ -97,21 +98,25 @@ namespace Amethyst.ModuleTweaker.Commands
                             foreach (var variable in symbolJson.Variables) {
                                 if (string.IsNullOrEmpty(variable.Name))
                                     continue;
-                                symbols.Add(new Patching.PE.V1.PEDataSymbol {
+                                symbols.Add(new Patching.PE.V2.PEDataSymbol {
                                     Name = variable.Name,
                                     IsVirtualTable = false,
                                     Address = ParseAddress(variable.Address),
                                     IsVirtualTableAddress = variable.IsVirtualTableAddress,
-                                    HasStorage = variable.IsVirtualTableAddress
+                                    HasStorage = variable.IsVirtualTableAddress,
+                                    IsSignature = variable.Signature is not null,
+                                    Signature = variable.Signature ?? string.Empty
                                 });
                             }
                             foreach (var vtable in symbolJson.VirtualTables) {
                                 if (string.IsNullOrEmpty(vtable.Name))
                                     continue;
-                                symbols.Add(new Patching.PE.V1.PEDataSymbol {
+                                symbols.Add(new Patching.PE.V2.PEDataSymbol {
                                     Name = vtable.Name,
                                     IsVirtualTable = true,
-                                    Address = ParseAddress(vtable.Address)
+                                    Address = ParseAddress(vtable.Address),
+                                    IsSignature = vtable.Signature is not null,
+                                    Signature = vtable.Signature ?? string.Empty
                                 });
                             }
                             break;

@@ -169,6 +169,7 @@ namespace Amethyst.SymbolGenerator.Commands
                                 annotationsData[location.File].Add(new VariableSymbolModel {
                                     Name = variable.MangledName,
                                     Address = vtable.Address,
+                                    Signature = vtable.Signature,
                                     IsVirtualTableAddress = true
                                 });
                             }

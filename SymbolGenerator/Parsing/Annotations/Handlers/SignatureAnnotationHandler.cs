@@ -15,10 +15,18 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
             if (ParameterPack.Platform != Processor.PlatformType)
                 return HandlerAction.SilentlySkip;
 
-            if (annotation.Target is not ASTMethod method)
-                throw new UnhandledAnnotationException($"Signature annotation can only be applied to methods. Applied to {annotation.Target.GetType().Name} instead.", annotation);
-            if (!method.IsImported)
-                throw new UnhandledAnnotationException("Signature annotation can only be applied to imported methods.", annotation);
+            if (annotation.Target is ASTMethod method) {
+                if (!method.IsImported)
+                    throw new UnhandledAnnotationException("Signature annotation can only be applied to imported methods.", annotation);
+            }
+            else if (annotation.Target is ASTVariable variable) {
+                if (!variable.IsFreeVariable && !variable.IsStatic)
+                    throw new UnhandledAnnotationException("Signature annotation can only be applied to static or free variables.", annotation);
+                if (!variable.IsImported)
+                    throw new UnhandledAnnotationException("Signature annotation can only be applied to imported variables.", annotation);
+            }
+            else
+                throw new UnhandledAnnotationException($"Signature annotation can only be applied to methods or variables. Applied to {annotation.Target.GetType().Name} instead.", annotation);
 
             if (annotation.Target.HasAnyOfAnnotations([
                 new(annotation.Tag, ParameterPack.Platform),
@@ -30,16 +38,29 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
 
         public override ProcessedAnnotation Handle(RawAnnotation annotation)
         {
-            ASTMethod target = (annotation.Target as ASTMethod)!;
-            return new ProcessedAnnotation(
-                annotation,
-                new(annotation.Tag, ParameterPack.Platform),
-                new FunctionSymbolModel
-                {
-                    Name = target.MangledName,
-                    Signature = ParameterPack.Signature
-                }
-            );
+            if (annotation.Target is ASTVariable variable)
+            {
+                return new ProcessedAnnotation(
+                    annotation,
+                    new(annotation.Tag, ParameterPack.Platform),
+                    new VariableSymbolModel {
+                        Name = variable.MangledName,
+                        Signature = ParameterPack.Signature
+                    }
+                );
+            }
+            else if (annotation.Target is ASTMethod method)
+            {
+                return new ProcessedAnnotation(
+                    annotation,
+                    new(annotation.Tag, ParameterPack.Platform),
+                    new FunctionSymbolModel {
+                        Name = method.MangledName,
+                        Signature = ParameterPack.Signature
+                    }
+                );
+            }
+            throw new UnhandledAnnotationException($"Signature annotation can only be applied to methods or variables. Applied to {annotation.Target.GetType().Name} instead.", annotation);
         }
     }
 }

@@ -13,7 +13,10 @@ namespace Amethyst.Common.Models
         public string Name { get; set; } = string.Empty;
 
         [JsonProperty("address")]
-        public string Address { get; set; } = string.Empty;
+        public string? Address { get; set; } = null;
+
+        [JsonProperty("signature")]
+        public string? Signature { get; set; } = null;
 
         [JsonIgnore]
         public string ForWhat { get; set; } = string.Empty;

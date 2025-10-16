@@ -39,7 +39,8 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
                 new VirtualTableSymbolModel
                 {
                     Name = $"{target.FullName}::vtable::'{ParameterPack.TargetVirtualTable}'",
-                    Address = $"0x{ParameterPack.Address:x}",
+                    Address = ParameterPack.Signature is null ? $"0x{ParameterPack.Address:x}" : null,
+                    Signature = ParameterPack.Signature,
                     ForWhat = ParameterPack.TargetVirtualTable,
                     VtableMangledLabel = ParameterPack.VirtualTableMangledName
                 }

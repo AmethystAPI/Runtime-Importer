@@ -26,6 +26,6 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.ParameterPacks {
         }
 
         [GeneratedRegex(@"^(?:[0-9A-Fa-f]{2}|\?)(?:\s+(?:[0-9A-Fa-f]{2}|\?))*$")]
-        private static partial Regex IDASignatureRegex();
+        public static partial Regex IDASignatureRegex();
     }
 }

@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 namespace Amethyst.SymbolGenerator.Parsing.Annotations.ParameterPacks {
     public class VirtualPointerAnnotationParameterPack(RawAnnotation annotation) : AbstractParameterPack<VirtualPointerAnnotationParameterPack>(annotation) {
         public ulong Address { get; private set; } = 0;
+        public string? Signature { get; set; } = null;
         public string TargetVirtualTable { get; private set; } = string.Empty;
         public string? VirtualTableMangledName { get; set; } = null;
         public PlatformType Platform { get; private set; } = PlatformType.WinClient;
@@ -23,16 +24,24 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.ParameterPacks {
                 throw new UnhandledAnnotationException($"Virtual pointer annotation requires at least one argument. Received {args.Length}.", Annotation);
             
             var addressArg = args[0];
-            NumberStyles styles;
-            if (args[0].StartsWith("0x")) {
-                addressArg = addressArg.Replace("0x", "");
-                styles = NumberStyles.HexNumber;
+            if (SignatureAnnotationParameterPack.IDASignatureRegex().Match(addressArg).Success) {
+                Signature = addressArg;
+                Address = 0;
             }
-            else
-                styles = NumberStyles.Integer;
-            if (!ulong.TryParse(addressArg, styles, null, out ulong addr))
-                throw new UnhandledAnnotationException($"Virtual pointer annotation first argument must be a valid hexadecimal or decimal number. Received {args[0]}", Annotation);
-            Address = addr;
+            else {
+                NumberStyles styles;
+                if (args[0].StartsWith("0x")) {
+                    addressArg = addressArg.Replace("0x", "");
+                    styles = NumberStyles.HexNumber;
+                }
+                else
+                    styles = NumberStyles.Integer;
+                if (!ulong.TryParse(addressArg, styles, null, out ulong addr))
+                    throw new UnhandledAnnotationException($"Virtual pointer annotation first argument must be a valid hexadecimal or decimal number. Received {args[0]}", Annotation);
+                Address = addr;
+                Signature = null;
+            }
+            
             TargetVirtualTable = args.Length > 1 ? args[1] : "this";
 
             if (args.Length > 2)
