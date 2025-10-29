@@ -22,6 +22,9 @@ namespace Amethyst.LibraryGenerator.Commands
         [CommandOption("platform", 'p', Description = "Target platform for symbol generation (e.g., win-client, win-server).", IsRequired = false)]
         public string Platform { get; set; } = "win-client";
 
+        [CommandOption("pregen-sym", Description = "Overrides the default pregenerated.symbols.json file folder.")]
+        public string? PregeneratedSymbolsPath { get; set; }
+
         public ValueTask ExecuteAsync(IConsole console)
         {
             if (!PlatformUtility.TryParse(Platform, out PlatformType PlatformType))
@@ -79,7 +82,9 @@ namespace Amethyst.LibraryGenerator.Commands
                 .EnumerateFiles("*.symbols.json", SearchOption.AllDirectories)
                 .Where(f => Path.GetFileName(f.FullName) != "pregenerated.symbols.json");
 
-            string pregeneratedPath = Path.Combine(PlatformSymbolInput.FullName, "pregenerated.symbols.json");
+            string pregeneratedPath = PregeneratedSymbolsPath is null ? 
+                Path.Combine(PlatformSymbolInput.FullName, "pregenerated.symbols.json") :
+                PregeneratedSymbolsPath;
             if (File.Exists(pregeneratedPath)) {
                 symbolFiles = symbolFiles.Prepend(new FileInfo(pregeneratedPath));
             }
