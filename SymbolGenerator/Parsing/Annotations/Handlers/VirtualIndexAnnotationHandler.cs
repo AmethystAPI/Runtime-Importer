@@ -17,7 +17,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
 
         public override HandlerAction CanHandle(RawAnnotation annotation)
         {
-            if (ParameterPack.Platform != Processor.PlatformType)
+            if (ParameterPack.Platform != PlatformType.WinAny && ParameterPack.Platform != Processor.PlatformType)
                 return HandlerAction.SilentlySkip;
 
             // Validated by the Parameter Pack

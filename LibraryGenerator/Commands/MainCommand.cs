@@ -19,8 +19,14 @@ namespace Amethyst.LibraryGenerator.Commands
         [CommandOption("output", 'o', Description = "Path to the output directory where the lib will be generated.", IsRequired = true)]
         public string OutputPath { get; set; } = null!;
 
+        [CommandOption("platform", 'p', Description = "Target platform for symbol generation (e.g., win-client, win-server).", IsRequired = false)]
+        public string Platform { get; set; } = "win-client";
+
         public ValueTask ExecuteAsync(IConsole console)
         {
+            if (!PlatformUtility.TryParse(Platform, out PlatformType PlatformType))
+                Logger.Fatal($"Invalid platform '{Platform}'. Supported platforms are: win-client, win-server.");
+
             DirectoryInfo Input = new(InputPath);
             DirectoryInfo Output = new(OutputPath);
 
@@ -30,16 +36,31 @@ namespace Amethyst.LibraryGenerator.Commands
                 return default;
             }
 
+            DirectoryInfo PlatformInput = new(Path.Combine(Input.FullName, Platform));
+            if (PlatformInput.Exists is false)
+            {
+                Logger.Warn($"Couldn't generate library, platform-specific input directory '{PlatformInput.FullName}' does not exist.");
+                return default;
+            }
+
+            DirectoryInfo PlatformSymbolInput = new(Path.Combine(PlatformInput.FullName, "symbols"));
+            if (PlatformSymbolInput.Exists is false) {
+                Logger.Warn($"Couldn't generate library, platform-specific symbols directory '{PlatformSymbolInput.FullName}' does not exist.");
+                return default;
+            }
+
             // Ensure output directory exists
             Directory.CreateDirectory(Output.FullName);
+            DirectoryInfo PlatformOutput = new(Path.Combine(Output.FullName, Platform));
+            Directory.CreateDirectory(PlatformOutput.FullName);
 
             // Track changes in symbol files
             FileTracker symbolTracker = null!;
             var (hadChanges, checksums) = Utils.Benchmark<(bool hadChanges, Dictionary<string, ulong> checksums)>("File Tracking", () =>
             {
                 symbolTracker = new(
-                    inputDirectory: Input,
-                    checksumFile: new FileInfo(Path.Combine(Output.FullName, "symbols_checksums.json")),
+                    inputDirectory: PlatformSymbolInput,
+                    checksumFile: new FileInfo(Path.Combine(PlatformOutput.FullName, $"symbols_checksums.json")),
                     searchPatterns: ["*.json"],
                     filters: []
                 );
@@ -54,7 +75,15 @@ namespace Amethyst.LibraryGenerator.Commands
             }
 
             // Collect all symbol files and accumulate mangled names
-            IEnumerable<FileInfo> symbolFiles = Input.EnumerateFiles("*.json", SearchOption.AllDirectories);
+            IEnumerable<FileInfo> symbolFiles = PlatformSymbolInput
+                .EnumerateFiles("*.symbols.json", SearchOption.AllDirectories)
+                .Where(f => Path.GetFileName(f.FullName) != "pregenerated.symbols.json");
+
+            string pregeneratedPath = Path.Combine(PlatformSymbolInput.FullName, "pregenerated.symbols.json");
+            if (File.Exists(pregeneratedPath)) {
+                symbolFiles = symbolFiles.Prepend(new FileInfo(pregeneratedPath));
+            }
+
             HashSet<string> allMangledNames = [];
             foreach (var symbolFile in symbolFiles)
             {
@@ -63,37 +92,29 @@ namespace Amethyst.LibraryGenerator.Commands
                 SymbolJSONModel? symbolJson = JsonConvert.DeserializeObject<SymbolJSONModel>(sr.ReadToEnd());
                 if (symbolJson is not null)
                 {
-                    switch (symbolJson.FormatVersion)
-                    {
-                        case 1:
-                            foreach (var function in symbolJson.Functions)
-                            {
-                                if (string.IsNullOrEmpty(function.Name))
-                                    continue;
-                                allMangledNames.Add(function.Name);
-                            }
+                    foreach (var function in symbolJson.Functions) {
+                        if (string.IsNullOrEmpty(function.Name))
+                            continue;
+                        allMangledNames.Add(function.Name);
+                    }
 
-                            foreach (var variable in symbolJson.Variables)
-                            {
-                                if (string.IsNullOrEmpty(variable.Name))
-                                    continue;
-                                allMangledNames.Add(variable.Name);
-                            }
+                    foreach (var variable in symbolJson.Variables) {
+                        if (string.IsNullOrEmpty(variable.Name))
+                            continue;
+                        allMangledNames.Add(variable.Name);
+                    }
 
-                            foreach (var vfunc in symbolJson.VirtualFunctions)
-                            {
-                                if (string.IsNullOrEmpty(vfunc.Name))
-                                    continue;
-                                allMangledNames.Add(vfunc.Name);
-                            }
-                            break;
+                    foreach (var vfunc in symbolJson.VirtualFunctions) {
+                        if (string.IsNullOrEmpty(vfunc.Name))
+                            continue;
+                        allMangledNames.Add(vfunc.Name);
                     }
                 }
             }
 
             // .def and .lib file paths
-            string defFilePath = Path.Combine(OutputPath, "Minecraft.Windows.def");
-            string libFilePath = Path.Combine(OutputPath, "Minecraft.Windows.lib");
+            string defFilePath = Path.Combine(PlatformOutput.FullName, "Minecraft.Windows.def");
+            string libFilePath = Path.Combine(PlatformOutput.FullName, "Minecraft.Windows.lib");
 
             // Create .def file
             Utils.CreateDefinitionFile(defFilePath, allMangledNames);

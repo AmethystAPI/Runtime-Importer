@@ -1,4 +1,5 @@
 ﻿using Amethyst.Common.Models;
+using Amethyst.Common.Utility;
 using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
 using Amethyst.SymbolGenerator.Parsing.Annotations.ParameterPacks;
 
@@ -11,13 +12,13 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
 
         public override HandlerAction CanHandle(RawAnnotation annotation)
         {
-            if (ParameterPack.Platform != Processor.PlatformType)
+            if (ParameterPack.Platform != PlatformType.WinAny && ParameterPack.Platform != Processor.PlatformType)
                 return HandlerAction.SilentlySkip;
 
             var targetAnnotations = annotation.Target.Annotations.Where(a => AnnotationProcessor.GetCanonicalTagForAlias(a.Annotation.Tag) == "vtable");
             foreach (var existing in targetAnnotations)
             {
-                if (existing.ID.Platform != ParameterPack.Platform)
+                if (existing.ID.Platform != PlatformType.WinAny && ParameterPack.Platform != PlatformType.WinAny && existing.ID.Platform != ParameterPack.Platform)
                     continue;
                 VirtualPointerAnnotationParameterPack existingParameterPack = new VirtualPointerAnnotationParameterPack(existing.Annotation)
                     .Parse();

@@ -1,4 +1,5 @@
 ﻿using Amethyst.Common.Models;
+using Amethyst.Common.Utility;
 using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
 using Amethyst.SymbolGenerator.Parsing.Annotations.ParameterPacks;
 
@@ -11,7 +12,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations.Handlers
 
         public override HandlerAction CanHandle(RawAnnotation annotation)
         {
-            if (ParameterPack.Platform != Processor.PlatformType)
+            if (ParameterPack.Platform != PlatformType.WinAny && ParameterPack.Platform != Processor.PlatformType)
                 return HandlerAction.SilentlySkip;
 
             if (annotation.Target is ASTMethod method)

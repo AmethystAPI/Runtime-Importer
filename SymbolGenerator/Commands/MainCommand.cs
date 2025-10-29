@@ -44,6 +44,8 @@ namespace Amethyst.SymbolGenerator.Commands
             
             // Ensure output directory exists
             Directory.CreateDirectory(Output.FullName);
+            DirectoryInfo PlatformOutput = new(Path.Combine(Output.FullName, Platform));
+            Directory.CreateDirectory(PlatformOutput.FullName);
 
             // Track changes in header files
             FileTracker headerTracker = null!;
@@ -51,7 +53,7 @@ namespace Amethyst.SymbolGenerator.Commands
             {
                 headerTracker = new(
                     inputDirectory: Input,
-                    checksumFile: new FileInfo(Path.Combine(Output.FullName, $"{Platform}_header_checksums.json")),
+                    checksumFile: new FileInfo(Path.Combine(PlatformOutput.FullName, $"header_checksums.json")),
                     searchPatterns: ["*.h", "*.hpp", "*.hh", "*.hxx"],
                     filters: [.. Filters]
                 );
@@ -70,7 +72,7 @@ namespace Amethyst.SymbolGenerator.Commands
             if (addedOrModified.Length != 0)
             {
                 // Prepare .cpp file for parsing
-                string generatedFile = Path.Combine(Output.FullName, "Generated.cpp");
+                string generatedFile = Path.Combine(PlatformOutput.FullName, "Generated.cpp");
                 List<string> willBeParsed = Utils.Benchmark<List<string>>("Prepare the Generated.cpp", () =>
                 {
                     return [.. Utils.CreateIncludeFile(generatedFile, Input.FullName, addedOrModified)];
@@ -198,11 +200,10 @@ namespace Amethyst.SymbolGenerator.Commands
                 foreach (var (file, data) in annotationsData)
                 {
                     string relativePath = Path.GetRelativePath(Input.FullName, file);
-                    string outputFilePath = Path.Combine(Output.FullName, "symbols", Path.ChangeExtension(relativePath, "symbols.json"));
+                    string outputFilePath = Path.Combine(PlatformOutput.FullName, "symbols", Path.ChangeExtension(relativePath, "symbols.json"));
                     Directory.CreateDirectory(Path.GetDirectoryName(outputFilePath)!);
                     string json = JsonConvert.SerializeObject(new SymbolJSONModel
                     {
-                        FormatVersion = 1,
                         Functions = [.. data.OfType<FunctionSymbolModel>()],
                         Variables = [.. data.OfType<VariableSymbolModel>()],
                         VirtualTables = [.. data.OfType<VirtualTableSymbolModel>().DistinctBy(k => k.Name)],
@@ -216,7 +217,7 @@ namespace Amethyst.SymbolGenerator.Commands
                 foreach (var change in deleted)
                 {
                     string relativePath = Path.GetRelativePath(Input.FullName, change.FilePath);
-                    string outputFilePath = Path.Combine(Output.FullName, "symbols", Path.ChangeExtension(relativePath, "symbols.json"));
+                    string outputFilePath = Path.Combine(PlatformOutput.FullName, "symbols", Path.ChangeExtension(relativePath, "symbols.json"));
                     if (File.Exists(outputFilePath))
                     {
                         File.Delete(outputFilePath);
