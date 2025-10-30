@@ -118,7 +118,7 @@ namespace Amethyst.LibraryGenerator.Commands
             }
 
             int index = 0;
-            foreach (var chunk in allMangledNames.ChunkBy(65534))
+            foreach (var chunk in allMangledNames.ChunkBy(65500))
             {
                 // .def and .lib file paths
                 string defFilePath = Path.Combine(PlatformOutput.FullName, $"Minecraft.Windows.{index}.def");
