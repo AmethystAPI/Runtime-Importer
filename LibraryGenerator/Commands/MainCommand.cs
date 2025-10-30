@@ -117,24 +117,31 @@ namespace Amethyst.LibraryGenerator.Commands
                 }
             }
 
-            // .def and .lib file paths
-            string defFilePath = Path.Combine(PlatformOutput.FullName, "Minecraft.Windows.def");
-            string libFilePath = Path.Combine(PlatformOutput.FullName, "Minecraft.Windows.lib");
-
-            // Create .def file
-            Utils.CreateDefinitionFile(defFilePath, allMangledNames);
-
-            // Generate .lib file
-            var libProc = Lib.GenerateLib(defFilePath, libFilePath);
-            libProc.WaitForExit();
-            if (libProc.ExitCode != 0)
+            int index = 0;
+            foreach (var chunk in allMangledNames.ChunkBy(65534))
             {
-                return ValueTask.FromException(new Exception("Library generation aborted due to errors."));
+                // .def and .lib file paths
+                string defFilePath = Path.Combine(PlatformOutput.FullName, $"Minecraft.Windows.{index}.def");
+                string libFilePath = Path.Combine(PlatformOutput.FullName, $"Minecraft.Windows.{index}.lib");
+
+                // Create .def file
+                Utils.CreateDefinitionFile(defFilePath, chunk);
+
+                // Generate .lib file
+                var libProc = Lib.GenerateLib(defFilePath, libFilePath);
+                libProc.WaitForExit();
+                if (libProc.ExitCode != 0) {
+                    return ValueTask.FromException(new Exception("Library generation aborted due to errors."));
+                }
+
+                Logger.Debug($"Library 'Minecraft.Windows.{index}.lib' generated succesfully.");
+                File.Delete(defFilePath); // Clean up .def file
+                File.Delete(Path.ChangeExtension(defFilePath, ".exp")); // Clean up .exp file
+                index++;
             }
 
             // Save updated checksums only if all operations succeeded
             symbolTracker.SaveChecksums(checksums);
-            Logger.Debug("Library 'Minecraft.Windows.lib' generated succesfully.");
             return default;
         }
     }

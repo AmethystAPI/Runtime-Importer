@@ -78,5 +78,25 @@ namespace Amethyst.Common.Utility
             for (int i = 0; i < padding; i++)
                 writer.Write(pad);
         }
+
+        public static IEnumerable<IEnumerable<T>> ChunkBy<T>(this IEnumerable<T> source, int chunkSize) {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source));
+            if (chunkSize <= 0)
+                throw new ArgumentOutOfRangeException(nameof(chunkSize));
+
+            using var enumerator = source.GetEnumerator();
+            while (enumerator.MoveNext()) {
+                yield return TakeChunk(enumerator, chunkSize);
+            }
+        }
+
+        private static IEnumerable<T> TakeChunk<T>(this IEnumerator<T> enumerator, int chunkSize) {
+            int count = 0;
+            do {
+                yield return enumerator.Current;
+                count++;
+            } while (count < chunkSize && enumerator.MoveNext());
+        }
     }
 }
