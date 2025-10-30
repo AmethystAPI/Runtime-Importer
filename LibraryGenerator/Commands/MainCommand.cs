@@ -135,7 +135,6 @@ namespace Amethyst.LibraryGenerator.Commands
                 }
 
                 Logger.Debug($"Library 'Minecraft.Windows.{index}.lib' generated succesfully.");
-                File.Delete(defFilePath); // Clean up .def file
                 File.Delete(Path.ChangeExtension(defFilePath, ".exp")); // Clean up .exp file
                 index++;
             }
