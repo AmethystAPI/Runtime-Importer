@@ -19,7 +19,7 @@ namespace Amethyst.LibraryGenerator.Commands
         [CommandOption("output", 'o', Description = "Path to the output directory where the lib will be generated.", IsRequired = true)]
         public string OutputPath { get; set; } = null!;
 
-        [CommandOption("platform", 'p', Description = "Target platform for symbol generation (e.g., win-client, win-server).", IsRequired = false)]
+        [CommandOption("platform", 'p', Description = "Target platform for symbol generation (e.g., win-client, win-server).")]
         public string Platform { get; set; } = "win-client";
 
         [CommandOption("pregen-sym", Description = "Overrides the default pregenerated.symbols.json file folder.")]
@@ -80,7 +80,7 @@ namespace Amethyst.LibraryGenerator.Commands
             // Collect all symbol files and accumulate mangled names
             IEnumerable<FileInfo> symbolFiles = PlatformSymbolInput
                 .EnumerateFiles("*.symbols.json", SearchOption.AllDirectories)
-                .Where(f => Path.GetFileName(f.FullName) != "pregenerated.symbols.json");
+                .Where(f => Path.GetFileName(f.FullName) != "pregenerated.symbols.json" && Path.GetFileName(f.FullName) != "template.pregenerated.symbols.json");
 
             string pregeneratedPath = PregeneratedSymbolsPath is null ? 
                 Path.Combine(PlatformSymbolInput.FullName, "pregenerated.symbols.json") :
@@ -117,6 +117,9 @@ namespace Amethyst.LibraryGenerator.Commands
                 }
             }
 
+            Directory.EnumerateFiles(PlatformOutput.FullName, "Minecraft.Windows.*.def").ToList().ForEach(File.Delete);
+            Directory.EnumerateFiles(PlatformOutput.FullName, "Minecraft.Windows.*.lib").ToList().ForEach(File.Delete);
+
             int index = 0;
             foreach (var chunk in allMangledNames.ChunkBy(65500))
             {
@@ -131,6 +134,7 @@ namespace Amethyst.LibraryGenerator.Commands
                 var libProc = Lib.GenerateLib(defFilePath, libFilePath);
                 libProc.WaitForExit();
                 if (libProc.ExitCode != 0) {
+                    Logger.Fatal($"lib.exe failed on chunk {index}, output: {libProc.StandardError.ReadToEnd()}");
                     return ValueTask.FromException(new Exception("Library generation aborted due to errors."));
                 }
 

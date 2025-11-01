@@ -67,8 +67,12 @@ namespace Amethyst.SymbolGenerator.Commands
                 .Where(c => c.ChangeType == ChangeType.Deleted)];
 
             List<RawAnnotation> annotations = [];
-            Dictionary<string, List<object>> annotationsData = [];
+            Dictionary<string, List<INamedSymbol>> annotationsData = [];
 
+            ASTMethod[] methods = [];
+            ASTVariable[] variables = [];
+            ASTClass[] classes = [];
+            AbstractAnnotationTarget[] targets = [];
             if (addedOrModified.Length != 0)
             {
                 // Prepare .cpp file for parsing
@@ -78,9 +82,6 @@ namespace Amethyst.SymbolGenerator.Commands
                     return [.. Utils.CreateIncludeFile(generatedFile, Input.FullName, addedOrModified)];
                 });
 
-                ASTMethod[] methods = [];
-                ASTVariable[] variables = [];
-                ASTClass[] classes = [];
                 Utils.Benchmark("Parse the AST", () =>
                 {
                     // Parse the generated .cpp file
@@ -109,6 +110,7 @@ namespace Amethyst.SymbolGenerator.Commands
                     methods = [.. visitor.Methods];
                     variables = [.. visitor.Variables];
                     classes = [.. visitor.Classes];
+                    targets = [.. methods, .. variables, .. classes];
                 });
 
                 Utils.Benchmark("Parse the comments", () =>
@@ -159,7 +161,8 @@ namespace Amethyst.SymbolGenerator.Commands
 
                         if (!annotationsData.ContainsKey(location.File))
                             annotationsData[location.File] = [];
-                        annotationsData[location.File].Add(processed.Data);
+                        // Kinda hacky, will change later
+                        annotationsData[location.File].Add((processed.Data as INamedSymbol)!);
 
                         if (processed.Data is VirtualTableSymbolModel vtable && processed.Target is ASTClass cls)
                         {
@@ -195,6 +198,34 @@ namespace Amethyst.SymbolGenerator.Commands
                 {
                     NullValueHandling = NullValueHandling.Ignore,
                 };
+
+                string templatePredefined = Path.Combine(PlatformOutput.FullName, "symbols", "template.pregenerated.symbols.json");
+                if (File.Exists(templatePredefined)) {
+                    string json = File.ReadAllText(templatePredefined);
+                    var predefinedSymbols = JsonConvert.DeserializeObject<SymbolJSONModel>(json, jsonSettings);
+                    if (predefinedSymbols is not null)
+                    {
+                        INamedSymbol[] namedSymbols = [
+                            ..predefinedSymbols.Functions,
+                            ..predefinedSymbols.Variables,
+                            ..predefinedSymbols.VirtualTables,
+                            ..predefinedSymbols.VirtualFunctions
+                        ];
+
+                        foreach (var symbol in namedSymbols)
+                        {
+                            if (targets.FirstOrDefault(t => Utils.CompareSymbolsWithThreshold(t.IdentificationName, symbol.Name)) is { } target) {
+                                if (!target.IsImported || annotationsData.SelectMany(kv => kv.Value).Any(v => Utils.CompareSymbolsWithThreshold(v.Name, symbol.Name)))
+                                    continue;
+                                string file = target.Location?.File ?? "<unknown>";
+                                if (!annotationsData.ContainsKey(file))
+                                    annotationsData[file] = [];
+                                symbol.Name = target.IdentificationName;
+                                annotationsData[file].Add(symbol);
+                            }
+                        }
+                    }
+                }
 
                 // Generate output JSON files
                 foreach (var (file, data) in annotationsData)

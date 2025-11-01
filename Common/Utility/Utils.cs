@@ -98,5 +98,40 @@ namespace Amethyst.Common.Utility
                 count++;
             } while (count < chunkSize && enumerator.MoveNext());
         }
+
+        public static int LevenshteinDistance(string a, string b) {
+            int[,] dp = new int[a.Length + 1, b.Length + 1];
+            for (int i = 0; i <= a.Length; i++)
+                dp[i, 0] = i;
+            for (int j = 0; j <= b.Length; j++)
+                dp[0, j] = j;
+
+            for (int i = 1; i <= a.Length; i++)
+                for (int j = 1; j <= b.Length; j++) {
+                    int cost = a[i - 1] == b[j - 1] ? 0 : 1;
+                    dp[i, j] = Math.Min(
+                        Math.Min(dp[i - 1, j] + 1, dp[i, j - 1] + 1),
+                        dp[i - 1, j - 1] + cost
+                    );
+                }
+
+            return dp[a.Length, b.Length];
+        }
+
+        public static bool CompareSymbolsWithThreshold(string symbolA, string symbolB, int charMatch = 3)
+        {
+            if (symbolA == symbolB)
+                return true;
+            if (symbolA.Length != symbolB.Length) 
+                return false;
+            int misses = 0;
+            for (int i = 0; i < symbolA.Length; i++) {
+                if (symbolA[i] != symbolB[i])
+                    misses++;
+                if (misses > charMatch)
+                    return false;
+            }
+            return true;
+        }
     }
 }

@@ -1,4 +1,4 @@
-﻿using Amethyst.Common.Diagnostics;
+using Amethyst.Common.Diagnostics;
 using Amethyst.Common.Utility;
 using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
 using System.Reflection;
@@ -58,6 +58,7 @@ namespace Amethyst.SymbolGenerator.Parsing.Annotations
             Type? handlerType = Handlers.FirstOrDefault(h => h.Key.Tags.Select(t => t.ToLowerInvariant()).Contains(tagLower)).Value;
             if (handlerType is null)
             {
+                Logger.Warn($"No handler found for annotation '{annotation}'", annotation.Location);
                 return;
             }
 

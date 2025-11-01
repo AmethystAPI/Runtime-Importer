@@ -7,10 +7,12 @@ namespace Amethyst.SymbolGenerator.Parsing
     {
         public string? Name { get; set; }
         public string? Namespace { get; set; }
+        public override string IdentificationName => FullName;
         public override CursorLocation? Location { get; set; }
         public ASTBaseSpecifier[] DirectBaseClasses { get; set; } = [];
         public ASTMethod[] Methods { get; set; } = [];
         public ASTVariable[] Variables { get; set; } = [];
+        public override bool IsImported { get; set; } = false;
         public string? RawComment { get; set; }
         public string FullName => string.IsNullOrEmpty(Namespace) ? Name! : $"{Namespace}::{Name}";
         public bool IsBase => DirectBaseClasses.Length == 0;

@@ -97,7 +97,7 @@ namespace Amethyst.ModuleTweaker.Commands
             // Collect all symbol files and accumulate mangled names
             IEnumerable<FileInfo> symbolFiles = PlatformSymbolInput
                 .EnumerateFiles("*.symbols.json", SearchOption.AllDirectories)
-                .Where(f => Path.GetFileName(f.FullName) != "pregenerated.symbols.json");
+                .Where(f => Path.GetFileName(f.FullName) != "pregenerated.symbols.json" && Path.GetFileName(f.FullName) != "template.pregenerated.symbols.json");
 
             string pregeneratedPath = PregeneratedSymbolsPath is null ? 
                 Path.Combine(PlatformSymbolInput.FullName, "pregenerated.symbols.json") :

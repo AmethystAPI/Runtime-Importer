@@ -7,10 +7,11 @@ namespace Amethyst.SymbolGenerator.Parsing
     {
         public string Name { get; set; } = string.Empty;
         public string MangledName { get; set; } = string.Empty;
+        public override string IdentificationName => MangledName;
         public string? Namespace { get; set; } = null;
         public ASTClass? DeclaringClass { get; set; } = null;
         public override CursorLocation? Location { get; set; } = null;
-        public bool IsImported { get; set; } = false;
+        public override bool IsImported { get; set; } = false;
         public string? RawComment { get; set; } = null;
         public bool IsStatic { get; set; } = false;
         public bool IsFreeVariable => DeclaringClass is null;

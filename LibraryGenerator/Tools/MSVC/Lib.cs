@@ -71,12 +71,6 @@ namespace Amethyst.LibraryGenerator.Tools.MSVC
             };
 
             process.BeginErrorReadLine();
-            process.ErrorDataReceived += (sender, data) =>
-            {
-                if (!string.IsNullOrEmpty(data.Data))
-                    Console.Error.WriteLine(data.Data);
-            };
-
             return process;
         }
     }

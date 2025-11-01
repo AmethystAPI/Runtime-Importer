@@ -7,8 +7,7 @@ using System.Threading.Tasks;
 
 namespace Amethyst.Common.Models
 {
-    public class VariableSymbolModel
-    {
+    public class VariableSymbolModel : INamedSymbol {
         [JsonProperty("name")]
         public string Name { get; set; } = string.Empty;
 
