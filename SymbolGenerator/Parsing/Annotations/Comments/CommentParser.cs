@@ -1,4 +1,5 @@
-﻿using Amethyst.Common.Utility;
+using Amethyst.Common.Diagnostics;
+using Amethyst.Common.Utility;
 using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
 using System.Text.RegularExpressions;
 

@@ -1,4 +1,4 @@
-﻿using Amethyst.Common.Utility;
+using Amethyst.Common.Utility;
 using Amethyst.SymbolGenerator.Parsing.Annotations;
 
 namespace Amethyst.SymbolGenerator.Parsing
@@ -13,7 +13,7 @@ namespace Amethyst.SymbolGenerator.Parsing
         public ASTMethod[] Methods { get; set; } = [];
         public ASTVariable[] Variables { get; set; } = [];
         public override bool IsImported { get; set; } = false;
-        public string? RawComment { get; set; }
+        public override string? RawComment { get; set; }
         public string FullName => string.IsNullOrEmpty(Namespace) ? Name! : $"{Namespace}::{Name}";
         public bool IsBase => DirectBaseClasses.Length == 0;
 

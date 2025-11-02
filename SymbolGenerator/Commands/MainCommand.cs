@@ -1,4 +1,4 @@
-﻿using Amethyst.Common.Diagnostics;
+using Amethyst.Common.Diagnostics;
 using Amethyst.Common.Models;
 using Amethyst.Common.Tracking;
 using Amethyst.Common.Utility;
@@ -115,30 +115,11 @@ namespace Amethyst.SymbolGenerator.Commands
 
                 Utils.Benchmark("Parse the comments", () =>
                 {
-                    // Extract annotations from variables
-                    foreach (var variable in variables)
+                    foreach (var target in targets)
                     {
-                        if (variable.RawComment is null || variable.Location is null)
+                        if (target.RawComment is null || target.Location is null)
                             continue;
-                        RawAnnotation[] anns = CommentParser.ParseAnnotations(variable, variable.RawComment, variable.Location).ToArray();
-                        annotations.AddRange(anns);
-                    }
-
-                    // Extract annotations from classes
-                    foreach (var cls in classes)
-                    {
-                        if (cls.RawComment is null || cls.Location is null)
-                            continue;
-                        RawAnnotation[] anns = CommentParser.ParseAnnotations(cls, cls.RawComment, cls.Location).ToArray();
-                        annotations.AddRange(anns);
-                    }
-
-                    // Extract annotations from non-virtual methods
-                    foreach (var method in methods)
-                    {
-                        if (method.RawComment is null || method.Location is null)
-                            continue;
-                        RawAnnotation[] anns = CommentParser.ParseAnnotations(method, method.RawComment, method.Location).ToArray();
+                        RawAnnotation[] anns = CommentParser.ParseAnnotations(target, target.RawComment, target.Location).ToArray();
                         annotations.AddRange(anns);
                     }
                 });
@@ -153,8 +134,12 @@ namespace Amethyst.SymbolGenerator.Commands
                         if (processed is null)
                             continue;
 
-                        if (processed.Target.Location is not { } location || location.File == "<unknown>")
-                        {
+                        if (processed.Data is not INamedSymbol symbol) {
+                            Logger.Debug($"Silently skipping '{processed.Target.IdentificationName}' due to invalid data type.");
+                            continue;
+                        }
+
+                        if (processed.Target.Location is not { } location || location.File == "<unknown>") {
                             Logger.Warn($"Skipping annotation for '{processed.Target}' due to unknown location.");
                             continue;
                         }
@@ -162,7 +147,7 @@ namespace Amethyst.SymbolGenerator.Commands
                         if (!annotationsData.ContainsKey(location.File))
                             annotationsData[location.File] = [];
                         // Kinda hacky, will change later
-                        annotationsData[location.File].Add((processed.Data as INamedSymbol)!);
+                        annotationsData[location.File].Add(symbol);
 
                         if (processed.Data is VirtualTableSymbolModel vtable && processed.Target is ASTClass cls)
                         {
@@ -214,8 +199,9 @@ namespace Amethyst.SymbolGenerator.Commands
 
                         foreach (var symbol in namedSymbols)
                         {
-                            if (targets.FirstOrDefault(t => Utils.CompareSymbolsWithThreshold(t.IdentificationName, symbol.Name)) is { } target) {
-                                if (!target.IsImported || annotationsData.SelectMany(kv => kv.Value).Any(v => Utils.CompareSymbolsWithThreshold(v.Name, symbol.Name)))
+                            if (targets.FirstOrDefault(t => t.IsNamedAs(symbol.Name)) is { } target) {
+                                
+                                if (!target.IsImported || annotationsData.SelectMany(kv => kv.Value).Any(v => v is not null && v.Name == symbol.Name))
                                     continue;
                                 string file = target.Location?.File ?? "<unknown>";
                                 if (!annotationsData.ContainsKey(file))

@@ -1,4 +1,4 @@
-﻿using Amethyst.Common.Diagnostics;
+using Amethyst.Common.Diagnostics;
 using Amethyst.Common.Extensions;
 using Amethyst.Common.Utility;
 using ClangSharp.Interop;

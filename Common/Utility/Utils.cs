@@ -1,4 +1,4 @@
-﻿using Amethyst.Common.Diagnostics;
+using Amethyst.Common.Diagnostics;
 using Amethyst.Common.Extensions;
 using Amethyst.Common.Tracking;
 using System.Diagnostics;
@@ -7,6 +7,25 @@ using System.Text.RegularExpressions;
 
 namespace Amethyst.Common.Utility
 {
+    public class FuzzyStringComparer : IEqualityComparer<string>
+    {
+        private readonly int _maxDistance;
+        public FuzzyStringComparer(int maxDistance = 1)
+        {
+            _maxDistance = maxDistance;
+        }
+        public bool Equals(string? x, string? y)
+        {
+            if (x == null || y == null)
+                return x == y;
+            return Utils.CompareSymbolsWithThreshold(x, y, _maxDistance);
+        }
+        public int GetHashCode(string obj)
+        {
+            return obj.GetHashCode();
+        }
+    }
+
     public static partial class Utils
     {
         public static T Benchmark<T>(string name, Func<T> action)
@@ -118,17 +137,18 @@ namespace Amethyst.Common.Utility
             return dp[a.Length, b.Length];
         }
 
-        public static bool CompareSymbolsWithThreshold(string symbolA, string symbolB, int charMatch = 3)
-        {
-            if (symbolA == symbolB)
+        public static bool CompareSymbolsWithThreshold(string a, string b, int maxDistance = 1) {
+            if (a == b)
                 return true;
-            if (symbolA.Length != symbolB.Length) 
+            if (a.Length != b.Length)
                 return false;
-            int misses = 0;
-            for (int i = 0; i < symbolA.Length; i++) {
-                if (symbolA[i] != symbolB[i])
-                    misses++;
-                if (misses > charMatch)
+
+            int mismatches = 0;
+            for (int i = 0; i < a.Length; i++) {
+                if (a[i] != b[i]) {
+                    mismatches++;
+                }
+                if (mismatches > maxDistance)
                     return false;
             }
             return true;

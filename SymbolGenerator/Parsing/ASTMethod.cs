@@ -1,4 +1,4 @@
-﻿using Amethyst.Common.Utility;
+using Amethyst.Common.Utility;
 using Amethyst.SymbolGenerator.Parsing.Annotations;
 
 namespace Amethyst.SymbolGenerator.Parsing
@@ -15,7 +15,7 @@ namespace Amethyst.SymbolGenerator.Parsing
         public override bool IsImported { get; set; } = false;
         public bool IsConstructor { get; set; } = false;
         public bool IsDestructor { get; set; } = false;
-        public string? RawComment { get; set; } = null;
+        public override string? RawComment { get; set; } = null;
         public ASTMethod? OverrideOf { get; set; }
         public bool IsFreeFunction => DeclaringClass is null;
         public string FullName
