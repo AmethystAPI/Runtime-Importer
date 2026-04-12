@@ -18,17 +18,18 @@ namespace Amethyst.SymbolGenerator.Parsing
         private readonly Dictionary<string, ASTClass> ClassCache = [];
         private readonly Dictionary<string, ASTMethod> MethodCache = [];
         private readonly Dictionary<string, ASTVariable> VariableCache = [];
+        private readonly HashSet<string> ClassesInProgress = [];
 
         public CXIndex Index { get; private set; }
         public CXTranslationUnit TranslationUnit { get; private set; }
-        public string InputDirectory { get; private set; }
+        public string[] InputDirectories { get; private set; }
         public HashSet<string> StrictHeaders { get; private set; } = [];
 
         public IReadOnlyCollection<ASTClass> Classes => ClassCache.Values;
         public IReadOnlyCollection<ASTMethod> Methods => MethodCache.Values;
         public IReadOnlyCollection<ASTVariable> Variables => VariableCache.Values;
 
-        public ASTVisitor(string inputFile, string inputDirectory, IEnumerable<string> arguments, IEnumerable<string> strictHeaders)
+        public ASTVisitor(string inputFile, string[] inputDirectories, IEnumerable<string> arguments, IEnumerable<string> strictHeaders)
         {
             Index = CXIndex.Create();
             var error = CXTranslationUnit.TryParse(
@@ -37,13 +38,13 @@ namespace Amethyst.SymbolGenerator.Parsing
                 arguments.ToArray(),
                 [],
                 CXTranslationUnit_Flags.CXTranslationUnit_SkipFunctionBodies |
-                CXTranslationUnit_Flags.CXTranslationUnit_Incomplete | 
+                CXTranslationUnit_Flags.CXTranslationUnit_Incomplete |
                 CXTranslationUnit_Flags.CXTranslationUnit_IgnoreNonErrorsFromIncludedFiles,
                 out var translationUnit);
             if (error != CXErrorCode.CXError_Success)
                 throw new Exception($"Failed to parse translation unit. Error code: {error}");
             TranslationUnit = translationUnit;
-            InputDirectory = inputDirectory.NormalizeSlashes();
+            InputDirectories = [.. inputDirectories.Select(d => d.NormalizeSlashes())];
             StrictHeaders = [.. strictHeaders.Select(h => Path.GetFullPath(h).NormalizeSlashes())];
         }
 
@@ -59,27 +60,42 @@ namespace Amethyst.SymbolGenerator.Parsing
             return diagnostics;
         }
 
-        public bool PrintErrors()
+        /// <summary>
+        /// Logs parse errors/warnings and returns the set of files that had errors.
+        /// Also sets <see cref="HasFatalErrors"/> if the AST is too corrupt to safely traverse.
+        /// </summary>
+        public bool HasFatalErrors { get; private set; }
+
+        public HashSet<string> GetFilesWithErrors()
         {
-            if (GetDiagnostics().All(d => d.Severity != CXDiagnosticSeverity.CXDiagnostic_Error && d.Severity != CXDiagnosticSeverity.CXDiagnostic_Fatal))
-                return false;
+            HashSet<string> errorFiles = [];
+            bool hasFatal = false;
             foreach (var diag in GetDiagnostics())
             {
-                Action<string, CursorLocation?>? log = diag.Severity switch
-                {
-                    CXDiagnosticSeverity.CXDiagnostic_Error => Logger.Error,
-                    CXDiagnosticSeverity.CXDiagnostic_Fatal => Logger.Error,
-                    _ => null
-                };
-                if (log is null)
+                if (diag.Severity == CXDiagnosticSeverity.CXDiagnostic_Fatal)
+                    hasFatal = true;
+
+                if (diag.Severity != CXDiagnosticSeverity.CXDiagnostic_Error && diag.Severity != CXDiagnosticSeverity.CXDiagnostic_Fatal)
                     continue;
+
                 var location = diag.Location;
                 location.GetFileLocation(out var file, out var line, out var column, out var offset);
                 string filePath = file.ToString() ?? "Unknown file";
                 string message = diag.Spelling.ToString() ?? "Unknown diagnostic message";
-                log(message, new(filePath, line, column));
+                Logger.Warn(message, new(filePath, line, column));
+
+                if (!string.IsNullOrEmpty(filePath) && filePath != "Unknown file")
+                    errorFiles.Add(Path.GetFullPath(filePath).NormalizeSlashes());
             }
-            return true;
+
+            HasFatalErrors = hasFatal;
+
+            if (hasFatal)
+                Logger.Warn("Fatal diagnostic detected (e.g. 'too many errors'). AST traversal will be skipped entirely.");
+            else if (errorFiles.Count > 0)
+                Logger.Warn($"{errorFiles.Count} file(s) had parse errors and will be skipped.");
+
+            return errorFiles;
         }
         #endregion
 
@@ -139,14 +155,9 @@ namespace Amethyst.SymbolGenerator.Parsing
                     return "Unknown";
             }
 
-            string? mangled = null;
-            unsafe
-            {
-                if (cursor.CXXManglings is not null)
-                    mangled = cursor.CXXManglings->FirstOrDefault().ToString();
-                else
-                    mangled = cursor.Mangling.ToString();
-            }
+            // Use Mangling (singular) instead of CXXManglings to avoid crashes
+            // from corrupt cursors in files with parse errors.
+            string? mangled = cursor.Mangling.ToString();
             
             if (string.IsNullOrEmpty(mangled))
                 mangled = "Unknown";
@@ -217,10 +228,10 @@ namespace Amethyst.SymbolGenerator.Parsing
 
         private bool ShouldProcessFile(string? file)
         {
-            if (string.IsNullOrEmpty(file)) 
+            if (string.IsNullOrEmpty(file))
                 return false;
             file = Path.GetFullPath(file).NormalizeSlashes();
-            return file.StartsWith(InputDirectory, StringComparison.Ordinal) && StrictHeaders.Contains(file);
+            return InputDirectories.Any(dir => file.StartsWith(dir, StringComparison.Ordinal)) && StrictHeaders.Contains(file);
         }
 
         private (List<CXCursor> methods, List<CXCursor> vars, List<CXCursor> classes, List<CXCursor> bases) CollectClassMembers(CXCursor cursor)
@@ -417,6 +428,11 @@ namespace Amethyst.SymbolGenerator.Parsing
             if (ClassCache.TryGetValue(usr, out var cached))
                 return (CXChildVisitResult.CXChildVisit_Continue, cached);
 
+            // Cycle detection: skip classes already being visited (prevents stack overflow
+            // from circular references like CRTP, self-referencing nested types, etc.)
+            if (!ClassesInProgress.Add(usr))
+                return (CXChildVisitResult.CXChildVisit_Continue, null);
+
             CursorLocation? location = GetLocation(cursor);
 
             // Collect members
@@ -468,6 +484,7 @@ namespace Amethyst.SymbolGenerator.Parsing
             rawClass.Variables.ToList().ForEach(v => v.DeclaringClass = rawClass);
 
             ClassCache[usr] = rawClass;
+            ClassesInProgress.Remove(usr);
             return (CXChildVisitResult.CXChildVisit_Recurse, rawClass);
         }
 

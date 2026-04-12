@@ -1,4 +1,4 @@
-﻿using Amethyst.Common.Extensions;
+using Amethyst.Common.Extensions;
 using K4os.Hash.xxHash;
 using Newtonsoft.Json;
 using System.Reflection;
@@ -7,7 +7,7 @@ using System.Text;
 namespace Amethyst.Common.Tracking
 {
     /// <summary>
-    /// Tracks changes to files.
+    /// Tracks changes to files across one or more input directories.
     /// </summary>
     public class FileTracker
     {
@@ -21,22 +21,43 @@ namespace Amethyst.Common.Tracking
             }
         }
 
-        public DirectoryInfo InputDirectory { get; private set; }
+        public DirectoryInfo[] InputDirectories { get; private set; }
         public FileInfo ChecksumFile { get; private set; }
         public string[] SearchPatterns { get; private set; }
         public string[] Filters { get; private set; }
 
-        public FileTracker(DirectoryInfo inputDirectory, FileInfo checksumFile, string[] searchPatterns, string[] filters)
+        public FileTracker(DirectoryInfo[] inputDirectories, FileInfo checksumFile, string[] searchPatterns, string[] filters)
         {
-            ArgumentNullException.ThrowIfNull(inputDirectory);
+            ArgumentNullException.ThrowIfNull(inputDirectories);
             ArgumentNullException.ThrowIfNull(checksumFile);
             ArgumentNullException.ThrowIfNull(searchPatterns);
-            if (inputDirectory.Exists is false)
-                throw new DirectoryNotFoundException($"Input directory '{inputDirectory.FullName}' does not exist.");
-            InputDirectory = inputDirectory;
+            if (inputDirectories.Length == 0)
+                throw new ArgumentException("At least one input directory is required.", nameof(inputDirectories));
+            foreach (var dir in inputDirectories)
+            {
+                if (dir.Exists is false)
+                    throw new DirectoryNotFoundException($"Input directory '{dir.FullName}' does not exist.");
+            }
+            InputDirectories = inputDirectories;
             ChecksumFile = checksumFile;
             SearchPatterns = searchPatterns;
             Filters = filters;
+        }
+
+        /// <summary>
+        /// Find which input directory a file belongs to and return the relative path.
+        /// </summary>
+        private string? GetRelativePathFromInputs(string filePath)
+        {
+            string normalized = filePath.Replace('\\', '/');
+            foreach (var dir in InputDirectories)
+            {
+                string dirNorm = dir.FullName.Replace('\\', '/');
+                if (!dirNorm.EndsWith('/')) dirNorm += '/';
+                if (normalized.StartsWith(dirNorm, StringComparison.OrdinalIgnoreCase))
+                    return Path.GetRelativePath(dir.FullName, filePath);
+            }
+            return null;
         }
 
         public (FileChange[] Changes, Dictionary<string, ulong> NewChecksums) TrackChanges()
@@ -61,16 +82,20 @@ namespace Amethyst.Common.Tracking
                 lastChecksums = [];
             }
 
-            // Collect all files matching the search patterns
-            IEnumerable<FileInfo> files = SearchPatterns
-                .SelectMany(p => InputDirectory.EnumerateFiles(p, SearchOption.AllDirectories))
-                .Select(f => f);
+            // Collect all files matching the search patterns across all input directories
+            IEnumerable<FileInfo> files = InputDirectories
+                .SelectMany(dir => SearchPatterns
+                    .SelectMany(p => dir.EnumerateFiles(p, SearchOption.AllDirectories)));
 
             // Check each file for changes
             foreach (var file in files)
             {
-                if (Filters.Any() && !Filters.Any(f => Path.GetRelativePath(InputDirectory.FullName, file.FullName).StartsWith(f)))
-                    continue;
+                if (Filters.Any())
+                {
+                    string? relativePath = GetRelativePathFromInputs(file.FullName);
+                    if (relativePath is null || !Filters.Any(f => relativePath.StartsWith(f)))
+                        continue;
+                }
                 string filePath = file.FullName.NormalizeSlashes();
 #if !DEBUG
                 string content = File.ReadAllText(file.FullName);

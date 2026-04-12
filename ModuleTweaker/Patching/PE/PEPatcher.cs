@@ -1,5 +1,4 @@
-﻿using Amethyst.Common.Diagnostics;
-using Amethyst.ModuleTweaker.Patching.PE.V1;
+using Amethyst.Common.Diagnostics;
 using Amethyst.ModuleTweaker.Utility;
 using AsmResolver;
 using AsmResolver.PE.File;
@@ -7,7 +6,7 @@ using AsmResolver.PE.File.Headers;
 using System.Text;
 
 namespace Amethyst.ModuleTweaker.Patching.PE {
-    public class PEPatcher(PEFile file, List<AbstractSymbol> symbols) : IPatcher {
+    public class PEPatcher(PEFile file, List<AbstractSymbol> symbols, bool includeDebugNames = true) : IPatcher {
         // Runtime Importer Header
         public const string SectionRTIH = ".rtih"; // Runtime Importer Header
         public const string SectionRTIS = ".rtis"; // Runtime Importer Storage
@@ -21,6 +20,7 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
 
         public PEFile File { get; } = file;
         public List<AbstractSymbol> Symbols { get; } = symbols;
+        public bool IncludeDebugNames { get; } = includeDebugNames;
 
         public bool IsCustomSection(string name) {
             return CustomSections.Contains(name);
@@ -35,10 +35,6 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
         }
 
         public bool Patch() {
-            // Version 1 full PE-specific layout:
-            // .rtih - Runtime Importer Header
-            // [PEImporterHeader data]
-
             if (IsPatched()) {
                 if (!Unpatch())
                     Logger.Fatal("Failed to unpatch existing patch, cannot re-patch.");
@@ -152,6 +148,7 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                 using var writer = new BinaryWriter(ms, Encoding.UTF8);
                 var header = new PEImporterHeader() {
                     Symbols = symbolsToWrite,
+                    IncludeDebugNames = IncludeDebugNames,
                     OldIDT = importDirectory.VirtualAddress,
                     OldIDTSize = importDirectory.Size,
                     ImportCount = index
@@ -202,18 +199,71 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
             for (int i = File.Sections.Count - 1; i >= 0; i--) {
                 var section = File.Sections[i]!;
                 if (section.Name == SectionRTIH) {
-                    using var reader = section.CreateReader().ToReader();
-                    var type = AbstractHeader.PeekInfo(reader);
-                    var header = HeaderFactory.Create(type);
-                    header.ReadFrom(reader);
+                    // Read just the header fields we need to restore IDT
+                    var asmReader = section.CreateReader();
+                    byte[] sectionData = asmReader.ReadToEnd();
+                    using var br = new BinaryReader(new MemoryStream(sectionData));
 
-                    if (header is not AbstractPEImporterHeader peHeader) {
-                        Logger.Warn($"RTIH section does not contain a valid PE Importer Header, cannot unpatch.");
-                        return false;
+                    // Read magic (prefixed string)
+                    int magicLen = br.ReadInt32();
+                    br.ReadBytes(magicLen);
+                    // Read version
+                    uint ver = br.ReadUInt32();
+                    if (ver == 2) {
+                        // V2 format: flags, symbol count, skip symbols, then OldIDT/OldIDTSize
+                        uint flags = br.ReadUInt32();
+                        bool hasDebugNames = (flags & 1) != 0;
+                        int symbolCount = br.ReadInt32();
+                        // Skip all symbols - we just need OldIDT/OldIDTSize at the end
+                        // Unfortunately we need to parse through them to find the end
+                        for (int s = 0; s < symbolCount; s++) {
+                            byte kind = br.ReadByte();        // KindTag
+                            br.ReadUInt64();                  // NameHash
+                            if (hasDebugNames) {
+                                int nameLen = br.ReadInt32();
+                                br.ReadBytes(nameLen);        // DebugName
+                            }
+                            br.ReadUInt32();                  // TargetOffset
+                            bool hasStorage = br.ReadByte() != 0;
+                            br.ReadUInt32();                  // StorageOffset
+
+                            if (kind == 0) { // Function
+                                bool isDestructor = br.ReadByte() != 0;
+                                bool isVirtual = br.ReadByte() != 0;
+                                if (isVirtual) {
+                                    br.ReadUInt32();          // VirtualIndex
+                                    br.ReadUInt64();          // VirtualTableHash
+                                    if (hasDebugNames) {
+                                        int vtLen = br.ReadInt32();
+                                        br.ReadBytes(vtLen);  // DebugVtName
+                                    }
+                                } else {
+                                    bool isSig = br.ReadByte() != 0;
+                                    if (isSig) {
+                                        uint count = br.ReadUInt32();
+                                        br.ReadBytes((int)(count * 2)); // compiled sig elements
+                                    } else {
+                                        br.ReadUInt64();      // Address
+                                    }
+                                }
+                            } else if (kind == 1) { // Data
+                                br.ReadByte();                // IsVirtualTableAddress
+                                br.ReadByte();                // IsVirtualTable
+                                bool isSig = br.ReadByte() != 0;
+                                if (isSig) {
+                                    uint count = br.ReadUInt32();
+                                    br.ReadBytes((int)(count * 2));
+                                } else {
+                                    br.ReadUInt64();          // Address
+                                }
+                            }
+                        }
+                        uint oldIDT = br.ReadUInt32();
+                        uint oldIDTSize = br.ReadUInt32();
+                        File.OptionalHeader.SetDataDirectory(DataDirectoryIndex.ImportDirectory, new DataDirectory(oldIDT, oldIDTSize));
+                    } else {
+                        Logger.Warn($"RTIH section has unknown format version {ver}, cannot restore IDT.");
                     }
-
-                    // Restore the old import directory
-                    File.OptionalHeader.SetDataDirectory(DataDirectoryIndex.ImportDirectory, new DataDirectory(peHeader.OldIDT, peHeader.OldIDTSize));
                 }
 
                 if (IsCustomSection(section.Name)) {

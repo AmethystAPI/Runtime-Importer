@@ -62,7 +62,7 @@ namespace Amethyst.LibraryGenerator.Commands
             var (hadChanges, checksums) = Utils.Benchmark<(bool hadChanges, Dictionary<string, ulong> checksums)>("File Tracking", () =>
             {
                 symbolTracker = new(
-                    inputDirectory: PlatformSymbolInput,
+                    inputDirectories: [PlatformSymbolInput],
                     checksumFile: new FileInfo(Path.Combine(PlatformOutput.FullName, $"symbols_checksums.json")),
                     searchPatterns: ["*.json"],
                     filters: []

@@ -9,6 +9,29 @@ namespace Amethyst.SymbolGenerator
     {
         public static string[] CompilerArguments = [];
 
+        /// <summary>
+        /// Expands @file response file arguments. Each line in the file becomes a separate argument.
+        /// </summary>
+        private static IEnumerable<string> ExpandResponseFiles(IEnumerable<string> args)
+        {
+            foreach (var arg in args)
+            {
+                if (arg.StartsWith('@') && File.Exists(arg[1..]))
+                {
+                    foreach (var line in File.ReadAllLines(arg[1..]))
+                    {
+                        string trimmed = line.Trim();
+                        if (!string.IsNullOrEmpty(trimmed))
+                            yield return trimmed;
+                    }
+                }
+                else
+                {
+                    yield return arg;
+                }
+            }
+        }
+
         static async Task<int> Main(string[] args)
         {
             Version version = Assembly.GetEntryAssembly()?.GetName()?.Version ?? new Version(1, 0, 0);
@@ -34,7 +57,7 @@ namespace Amethyst.SymbolGenerator
             if (sepIndex >= 0)
             {
                 before = [.. args.Take(sepIndex)];
-                CompilerArguments = [.. args.Skip(sepIndex + 1)];
+                CompilerArguments = [.. ExpandResponseFiles(args.Skip(sepIndex + 1))];
             }
 
             return await new CliApplicationBuilder()

@@ -1,6 +1,7 @@
 using Amethyst.Common.Diagnostics;
 using Amethyst.Common.Extensions;
 using Amethyst.Common.Tracking;
+using K4os.Hash.xxHash;
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -48,7 +49,7 @@ namespace Amethyst.Common.Utility
         [GeneratedRegex(@"^\s*///\s*@\s*(symbolgeneration|symbols)\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase)]
         private static partial Regex SymbolGenerationMarker();
 
-        public static string[] CreateIncludeFile(string includeFile, string inputDir, IEnumerable<FileChange> files)
+        public static string[] CreateIncludeFile(string includeFile, string[] inputDirs, IEnumerable<FileChange> files)
         {
             List<string> willBeParsed = [];
             var sb = new StringBuilder();
@@ -58,11 +59,28 @@ namespace Amethyst.Common.Utility
                 if (!SymbolGenerationMarker().Match(File.ReadAllText(header.FilePath)).Success)
                     continue;
                 willBeParsed.Add(header.FilePath.NormalizeSlashes());
-                sb.AppendLine(@$"#include ""{Path.GetRelativePath(inputDir, header.FilePath).NormalizeSlashes()}""");
+                string relativePath = GetRelativePathFromInputs(inputDirs, header.FilePath);
+                sb.AppendLine(@$"#include ""{relativePath.NormalizeSlashes()}""");
             }
             sb.AppendLine("// End of generated file.");
             File.WriteAllText(includeFile, sb.ToString());
             return [.. willBeParsed];
+        }
+
+        /// <summary>
+        /// Find which input directory a file belongs to and return the relative path from that directory.
+        /// </summary>
+        public static string GetRelativePathFromInputs(string[] inputDirs, string filePath)
+        {
+            string normalized = filePath.Replace('\\', '/');
+            foreach (var inputDir in inputDirs)
+            {
+                string dirNorm = inputDir.Replace('\\', '/');
+                if (!dirNorm.EndsWith('/')) dirNorm += '/';
+                if (normalized.StartsWith(dirNorm, StringComparison.OrdinalIgnoreCase))
+                    return Path.GetRelativePath(inputDir, filePath);
+            }
+            return Path.GetRelativePath(inputDirs[0], filePath);
         }
 
         public static void CreateDefinitionFile(string defFile, IEnumerable<string> mangledNames)
@@ -89,6 +107,27 @@ namespace Amethyst.Common.Utility
             int length = reader.ReadInt32();
             byte[] bytes = reader.ReadBytes(length);
             return Encoding.UTF8.GetString(bytes);
+        }
+
+        public static void WriteHashedName(this BinaryWriter writer, string name, bool includeDebug) {
+            byte[] nameBytes = Encoding.UTF8.GetBytes(name);
+            writer.Write(XXH64.DigestOf(nameBytes));
+            if (includeDebug)
+                writer.WritePrefixedString(name);
+        }
+
+        public static void WriteCompiledSignature(this BinaryWriter writer, string signature) {
+            var tokens = signature.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            writer.Write((uint)tokens.Length);
+            foreach (var token in tokens) {
+                if (token.StartsWith('?')) {
+                    writer.Write((byte)0);  // value (unused)
+                    writer.Write((byte)0);  // present = false (wildcard)
+                } else {
+                    writer.Write(Convert.ToByte(token, 16));  // value
+                    writer.Write((byte)1);                     // present = true
+                }
+            }
         }
 
         public static void Align(this BinaryWriter writer, int alignment = 16, byte pad = 0x00) {

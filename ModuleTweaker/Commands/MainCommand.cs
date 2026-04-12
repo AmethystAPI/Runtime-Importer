@@ -1,16 +1,14 @@
-﻿using Amethyst.Common.Diagnostics;
+using Amethyst.Common.Diagnostics;
 using Amethyst.Common.Models;
 using Amethyst.ModuleTweaker.Patching;
+using Amethyst.ModuleTweaker.Patching.PE;
 using AsmResolver.PE.File;
-using AsmResolver.PE.Imports;
 using CliFx;
 using CliFx.Attributes;
 using CliFx.Infrastructure;
 using K4os.Hash.xxHash;
 using Newtonsoft.Json;
-using System;
 using System.Globalization;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Amethyst.ModuleTweaker.Commands
 {
@@ -31,6 +29,9 @@ namespace Amethyst.ModuleTweaker.Commands
 
         [CommandOption("pregen-sym", Description = "Overrides the default pregenerated.symbols.json file folder.")]
         public string? PregeneratedSymbolsPath { get; set; }
+
+        [CommandOption("obfuscate", Description = "Strip debug names from .rtih for production builds.")]
+        public bool Obfuscate { get; set; } = false;
 
         public ValueTask ExecuteAsync(IConsole console)
         {
@@ -89,17 +90,14 @@ namespace Amethyst.ModuleTweaker.Commands
                 return addr;
             }
 
-            SymbolFactory.Register(new SymbolType(1, "pe32+", "data"), () => new Patching.PE.V1.PEDataSymbol());
-            SymbolFactory.Register(new SymbolType(2, "pe32+", "data"), () => new Patching.PE.V2.PEDataSymbol());
-            SymbolFactory.Register(new SymbolType(1, "pe32+", "function"), () => new Patching.PE.V1.PEFunctionSymbol());
-            HeaderFactory.Register(new HeaderType(1, "pe32+"), (args) => new Patching.PE.V1.PEImporterHeader());
+            bool includeDebugNames = !Obfuscate;
 
             // Collect all symbol files and accumulate mangled names
             IEnumerable<FileInfo> symbolFiles = PlatformSymbolInput
                 .EnumerateFiles("*.symbols.json", SearchOption.AllDirectories)
                 .Where(f => Path.GetFileName(f.FullName) != "pregenerated.symbols.json" && Path.GetFileName(f.FullName) != "template.pregenerated.symbols.json");
 
-            string pregeneratedPath = PregeneratedSymbolsPath is null ? 
+            string pregeneratedPath = PregeneratedSymbolsPath is null ?
                 Path.Combine(PlatformSymbolInput.FullName, "pregenerated.symbols.json") :
                 PregeneratedSymbolsPath;
             if (File.Exists(pregeneratedPath)) {
@@ -117,7 +115,7 @@ namespace Amethyst.ModuleTweaker.Commands
                     foreach (var function in symbolJson.Functions) {
                         if (string.IsNullOrEmpty(function.Name))
                             continue;
-                        symbols[function.Name] = new Patching.PE.V1.PEFunctionSymbol {
+                        symbols[function.Name] = new PEFunctionSymbol {
                             Name = function.Name,
                             IsVirtual = false,
                             IsSignature = function.Signature is not null,
@@ -128,7 +126,7 @@ namespace Amethyst.ModuleTweaker.Commands
                     foreach (var vfunc in symbolJson.VirtualFunctions) {
                         if (string.IsNullOrEmpty(vfunc.Name))
                             continue;
-                        symbols[vfunc.Name] = new Patching.PE.V1.PEFunctionSymbol {
+                        symbols[vfunc.Name] = new PEFunctionSymbol {
                             Name = vfunc.Name,
                             IsVirtual = true,
                             VirtualIndex = vfunc.Index,
@@ -140,12 +138,13 @@ namespace Amethyst.ModuleTweaker.Commands
                     foreach (var variable in symbolJson.Variables) {
                         if (string.IsNullOrEmpty(variable.Name))
                             continue;
-                        symbols[variable.Name] = new Patching.PE.V2.PEDataSymbol {
+                        bool isVtableAddr = variable.IsVirtualTableAddress || variable.Name.Contains("$vtable_for_");
+                        symbols[variable.Name] = new PEDataSymbol {
                             Name = variable.Name,
                             IsVirtualTable = false,
                             Address = ParseAddress(variable.Address),
-                            IsVirtualTableAddress = variable.IsVirtualTableAddress,
-                            HasStorage = variable.IsVirtualTableAddress,
+                            IsVirtualTableAddress = isVtableAddr,
+                            HasStorage = isVtableAddr,
                             IsSignature = variable.Signature is not null,
                             Signature = variable.Signature ?? string.Empty
                         };
@@ -153,7 +152,7 @@ namespace Amethyst.ModuleTweaker.Commands
                     foreach (var vtable in symbolJson.VirtualTables) {
                         if (string.IsNullOrEmpty(vtable.Name))
                             continue;
-                        symbols[vtable.Name] = new Patching.PE.V2.PEDataSymbol {
+                        symbols[vtable.Name] = new PEDataSymbol {
                             Name = vtable.Name,
                             IsVirtualTable = true,
                             Address = ParseAddress(vtable.Address),
@@ -173,7 +172,7 @@ namespace Amethyst.ModuleTweaker.Commands
                     return default;
                 }
                 Logger.Info($"Loaded module '{ModulePath}' as PE file.");
-                var patcher = new Patching.PE.PEPatcher(peFile, [..symbols.Values]);
+                var patcher = new PEPatcher(peFile, [..symbols.Values], includeDebugNames);
 
                 if (patcher.Patch())
                 {

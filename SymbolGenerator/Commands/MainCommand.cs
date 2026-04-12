@@ -1,4 +1,5 @@
 using Amethyst.Common.Diagnostics;
+using Amethyst.Common.Extensions;
 using Amethyst.Common.Models;
 using Amethyst.Common.Tracking;
 using Amethyst.Common.Utility;
@@ -16,8 +17,8 @@ namespace Amethyst.SymbolGenerator.Commands
     [Command(Description = "Generates symbol files based on the provided configuration.")]
     public partial class MainCommand : ICommand
     {
-        [CommandOption("input", 'i', Description = "Path to the input directory containing header files.", IsRequired = true)]
-        public string InputPath { get; set; } = null!;
+        [CommandOption("input", 'i', Description = "Paths to input directories containing header files. Can be specified multiple times.", IsRequired = true)]
+        public IReadOnlyList<string> InputPaths { get; set; } = null!;
 
         [CommandOption("output", 'o', Description = "Path to the output directory where symbol files will be generated.", IsRequired = true)]
         public string OutputPath { get; set; } = null!;
@@ -28,9 +29,25 @@ namespace Amethyst.SymbolGenerator.Commands
         [CommandOption("platform", 'p', Description = "Target platform for symbol generation (e.g., win-client, win-server).", IsRequired = false)]
         public string Platform { get; set; } = "win-client";
 
+        /// <summary>
+        /// Given an absolute file path, find which input directory it belongs to and return the relative path.
+        /// </summary>
+        private string GetRelativePath(DirectoryInfo[] inputs, string filePath)
+        {
+            string normalized = filePath.Replace('\\', '/');
+            foreach (var input in inputs)
+            {
+                string inputNorm = input.FullName.Replace('\\', '/');
+                if (!inputNorm.EndsWith('/')) inputNorm += '/';
+                if (normalized.StartsWith(inputNorm, StringComparison.OrdinalIgnoreCase))
+                    return Path.GetRelativePath(input.FullName, filePath);
+            }
+            return Path.GetRelativePath(inputs[0].FullName, filePath);
+        }
+
         public ValueTask ExecuteAsync(IConsole console)
         {
-            DirectoryInfo Input = new(InputPath);
+            DirectoryInfo[] Inputs = [.. InputPaths.Select(p => new DirectoryInfo(p))];
             DirectoryInfo Output = new(OutputPath);
             if (Platform == "win-any")
                 Logger.Fatal("Platform 'win-any' is not supported for symbol generation. Please specify either 'win-client' or 'win-server'.");
@@ -38,21 +55,24 @@ namespace Amethyst.SymbolGenerator.Commands
             if (!PlatformUtility.TryParse(Platform, out PlatformType PlatformType))
                 Logger.Fatal($"Invalid platform '{Platform}'. Supported platforms are: win-client, win-server.");
 
-            // Ensure input directory exists
-            if (Input.Exists is false)
-                Logger.Fatal($"Input directory '{Input.FullName}' does not exist.");
-            
+            // Ensure all input directories exist
+            foreach (var input in Inputs)
+            {
+                if (input.Exists is false)
+                    Logger.Fatal($"Input directory '{input.FullName}' does not exist.");
+            }
+
             // Ensure output directory exists
             Directory.CreateDirectory(Output.FullName);
             DirectoryInfo PlatformOutput = new(Path.Combine(Output.FullName, Platform));
             Directory.CreateDirectory(PlatformOutput.FullName);
 
-            // Track changes in header files
+            // Track changes in header files across all input directories
             FileTracker headerTracker = null!;
             var (changes, checksums) = Utils.Benchmark<(FileChange[] changes, Dictionary<string, ulong> checksums)>("File Tracking", () =>
             {
                 headerTracker = new(
-                    inputDirectory: Input,
+                    inputDirectories: Inputs,
                     checksumFile: new FileInfo(Path.Combine(PlatformOutput.FullName, $"header_checksums.json")),
                     searchPatterns: ["*.h", "*.hpp", "*.hh", "*.hxx"],
                     filters: [.. Filters]
@@ -73,13 +93,15 @@ namespace Amethyst.SymbolGenerator.Commands
             ASTVariable[] variables = [];
             ASTClass[] classes = [];
             AbstractAnnotationTarget[] targets = [];
+            HashSet<string> failedFiles = [];
             if (addedOrModified.Length != 0)
             {
                 // Prepare .cpp file for parsing
                 string generatedFile = Path.Combine(PlatformOutput.FullName, "Generated.cpp");
+                string[] inputFullNames = [.. Inputs.Select(i => i.FullName)];
                 List<string> willBeParsed = Utils.Benchmark<List<string>>("Prepare the Generated.cpp", () =>
                 {
-                    return [.. Utils.CreateIncludeFile(generatedFile, Input.FullName, addedOrModified)];
+                    return [.. Utils.CreateIncludeFile(generatedFile, inputFullNames, addedOrModified)];
                 });
 
                 Utils.Benchmark("Parse the AST", () =>
@@ -89,16 +111,26 @@ namespace Amethyst.SymbolGenerator.Commands
                     {
                         return new(
                             inputFile: generatedFile,
-                            inputDirectory: Input.FullName,
+                            inputDirectories: inputFullNames,
                             arguments: Program.CompilerArguments,
                             strictHeaders: willBeParsed
                         );
                     });
 
-                    // Handle diagnostics
-                    if (visitor.PrintErrors())
+                    // Log diagnostics and exclude files with errors from strict headers
+                    var errorFiles = visitor.GetFilesWithErrors();
+                    foreach (var errorFile in errorFiles)
+                        visitor.StrictHeaders.Remove(errorFile);
+                    failedFiles = errorFiles;
+
+                    // If fatal errors occurred (e.g. "too many errors"), the AST is too
+                    // corrupt to safely traverse — skip it entirely to avoid crashes.
+                    // Mark ALL files as failed so none get cached as "processed".
+                    if (visitor.HasFatalErrors)
                     {
-                        Logger.Fatal("Parsing failed due to errors.");
+                        Logger.Warn("Skipping AST traversal due to fatal parse errors. Fix the source errors and rebuild.");
+                        foreach (var file in willBeParsed)
+                            failedFiles.Add(Path.GetFullPath(file).NormalizeSlashes());
                         return;
                     }
 
@@ -123,7 +155,7 @@ namespace Amethyst.SymbolGenerator.Commands
                         annotations.AddRange(anns);
                     }
                 });
-                
+
                 Utils.Benchmark("Process annotations", () =>
                 {
                     // Process extracted annotations
@@ -200,7 +232,7 @@ namespace Amethyst.SymbolGenerator.Commands
                         foreach (var symbol in namedSymbols)
                         {
                             if (targets.FirstOrDefault(t => t.IsNamedAs(symbol.Name)) is { } target) {
-                                
+
                                 if (!target.IsImported || annotationsData.SelectMany(kv => kv.Value).Any(v => v is not null && v.Name == symbol.Name))
                                     continue;
                                 string file = target.Location?.File ?? "<unknown>";
@@ -216,7 +248,7 @@ namespace Amethyst.SymbolGenerator.Commands
                 // Generate output JSON files
                 foreach (var (file, data) in annotationsData)
                 {
-                    string relativePath = Path.GetRelativePath(Input.FullName, file);
+                    string relativePath = GetRelativePath(Inputs, file);
                     string outputFilePath = Path.Combine(PlatformOutput.FullName, "symbols", Path.ChangeExtension(relativePath, "symbols.json"));
                     Directory.CreateDirectory(Path.GetDirectoryName(outputFilePath)!);
                     string json = JsonConvert.SerializeObject(new SymbolJSONModel
@@ -233,7 +265,7 @@ namespace Amethyst.SymbolGenerator.Commands
                 // Handle deleted files
                 foreach (var change in deleted)
                 {
-                    string relativePath = Path.GetRelativePath(Input.FullName, change.FilePath);
+                    string relativePath = GetRelativePath(Inputs, change.FilePath);
                     string outputFilePath = Path.Combine(PlatformOutput.FullName, "symbols", Path.ChangeExtension(relativePath, "symbols.json"));
                     if (File.Exists(outputFilePath))
                     {
@@ -243,7 +275,15 @@ namespace Amethyst.SymbolGenerator.Commands
                 }
             });
 
-            // Save updated checksums only if all operations succeeded
+            // Remove failed files from checksums so they get re-processed next run
+            foreach (var file in failedFiles)
+            {
+                string normalized = file.Replace('\\', '/');
+                var key = checksums.Keys.FirstOrDefault(k => k.Replace('\\', '/').Equals(normalized, StringComparison.OrdinalIgnoreCase));
+                if (key is not null)
+                    checksums.Remove(key);
+            }
+
             headerTracker.SaveChecksums(checksums);
             return default;
         }
