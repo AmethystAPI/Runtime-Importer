@@ -6,7 +6,7 @@ using AsmResolver.PE.File.Headers;
 using System.Text;
 
 namespace Amethyst.ModuleTweaker.Patching.PE {
-    public class PEPatcher(PEFile file, List<AbstractSymbol> symbols, bool includeDebugNames = true) : IPatcher {
+    public class PEPatcher(PEFile file, List<AbstractSymbol> symbols, bool includeDebugNames = true, bool zeroFillImports = false) : IPatcher {
         // Runtime Importer Header
         public const string SectionRTIH = ".rtih"; // Runtime Importer Header
         public const string SectionRTIS = ".rtis"; // Runtime Importer Storage
@@ -21,6 +21,14 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
         public PEFile File { get; } = file;
         public List<AbstractSymbol> Symbols { get; } = symbols;
         public bool IncludeDebugNames { get; } = includeDebugNames;
+        public bool ZeroFillImports { get; } = zeroFillImports;
+
+        private record ZeroRange(uint Rva, uint Length, string Purpose);
+
+        // File offsets to zero in the serialized output, computed post-UpdateHeaders and
+        // applied by the caller after File.Write. Avoids touching AsmResolver section
+        // Contents, which subtly breaks LoadLibrary even when virtual size is preserved.
+        public List<(uint FileOffset, uint Length)> PostWriteZeros { get; } = [];
 
         public bool IsCustomSection(string name) {
             return CustomSections.Contains(name);
@@ -50,54 +58,81 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
             // Read existing import descriptors
             using var importReader = File.CreateDataDirectoryReader(importDirectory).ToReader();
             List<ImportDescriptor> importDescriptors = [];
-            uint targetIATRVA = 0;
-            uint targetILTRVA = 0;
+            List<ImportDescriptor> targetDescriptors = [];
             while (true) {
                 var entry = ImportDescriptor.Read(importReader);
                 if (entry.IsZero)
                     break;
                 string name = File.CreateReaderAtRva(entry.Name).ReadAsciiString();
                 if (name.StartsWith("Minecraft.Windows", StringComparison.OrdinalIgnoreCase)) {
-                    targetIATRVA = entry.OriginalFirstThunk;
-                    targetILTRVA = entry.FirstThunk;
+                    targetDescriptors.Add(entry);
                 }
                 importDescriptors.Add(entry);
             }
 
-            if (targetIATRVA == 0 || targetILTRVA == 0) {
+            if (targetDescriptors.Count == 0) {
                 Logger.Warn("PE file does not import from 'Minecraft.Windows', skipping patch.");
                 return false;
             }
+            if (targetDescriptors.Count > 1) {
+                Logger.Warn($"PE file has {targetDescriptors.Count} 'Minecraft.Windows' descriptors; all will be patched.");
+            }
 
-            // Map import names to their target RVAs
+            // Map import names to their target RVAs across all matching descriptors
             Dictionary<string, uint> importNameToTarget = [];
             List<AbstractSymbol> symbolsToWrite = [];
-            var targetILTReader = File.CreateReaderAtRva(targetILTRVA);
-            var targetIATReader = File.CreateReaderAtRva(targetIATRVA);
-            uint index = 0;
-            while (true) {
-                ulong iltEntry = targetILTReader.ReadUInt64();
-                if (iltEntry == 0)
-                    break;
-                index++;
-                ulong iatEntry = targetIATReader.ReadUInt64();
-                bool isOrdinal = (iltEntry & 0x8000000000000000) != 0;
-                if (isOrdinal) {
-                    continue;
+            List<ZeroRange> rangesToZero = [];
+            HashSet<uint> targetHintNameRvas = [];
+            uint totalImportCount = 0;
+
+            foreach (var target in targetDescriptors) {
+                uint targetILTRVA = target.OriginalFirstThunk; // hint/name RVAs
+                uint targetIATRVA = target.FirstThunk;         // code calls through this; runtime writes here
+
+                var targetILTReader = File.CreateReaderAtRva(targetILTRVA);
+                var targetIATReader = File.CreateReaderAtRva(targetIATRVA);
+                uint descriptorEntryCount = 0;
+                while (true) {
+                    ulong iltEntry = targetILTReader.ReadUInt64();
+                    if (iltEntry == 0)
+                        break;
+                    descriptorEntryCount++;
+                    totalImportCount++;
+                    ulong iatEntry = targetIATReader.ReadUInt64();
+                    bool isOrdinal = (iltEntry & 0x8000000000000000) != 0;
+                    if (isOrdinal)
+                        continue;
+                    uint hintNameRVA = (uint)(iltEntry & 0x7FFFFFFFFFFFFFFF);
+                    var hintNameReader = File.CreateReaderAtRva(hintNameRVA);
+                    ushort hint = hintNameReader.ReadUInt16();
+                    string name = hintNameReader.ReadAsciiString();
+
+                    // Zero-fill: record the hint+name blob (2-byte hint + name bytes + null terminator)
+                    uint hintNameLen = (uint)(2 + name.Length + 1);
+                    rangesToZero.Add(new ZeroRange(hintNameRVA, hintNameLen, $"hint+name:{name}"));
+                    targetHintNameRvas.Add(hintNameRVA);
+
+                    var symbol = Symbols.OfType<AbstractPESymbol>().FirstOrDefault(s => s.Name == name);
+                    if (symbol is null)
+                        continue;
+                    uint entryRVA = targetIATRVA + ((descriptorEntryCount - 1) * 8);
+                    importNameToTarget[name] = entryRVA;
+                    symbol.TargetOffset = entryRVA;
+                    symbolsToWrite.Add(symbol);
+                    Logger.Debug($"Mapping import {name} to target RVA 0x{entryRVA:X}...");
                 }
-                uint hintNameRVA = (uint)(iltEntry & 0x7FFFFFFFFFFFFFFF);
-                var hintNameReader = File.CreateReaderAtRva(hintNameRVA);
-                ushort hint = hintNameReader.ReadUInt16();
-                string name = hintNameReader.ReadAsciiString();
-                var symbol = Symbols.OfType<AbstractPESymbol>().FirstOrDefault(s => s.Name == name);
-                if (symbol is null)
-                    continue;
-                uint entryRVA = targetILTRVA + ((index - 1) * 8);
-                importNameToTarget[name] = entryRVA;
-                symbol.TargetOffset = entryRVA;
-                symbolsToWrite.Add(symbol);
-                Logger.Debug($"Mapping import {name} to target RVA 0x{entryRVA:X}...");
+
+                // Zero-fill: record ILT and IAT slot ranges (entries + 8-byte null terminator)
+                uint slotTableBytes = (descriptorEntryCount + 1) * 8;
+                rangesToZero.Add(new ZeroRange(targetILTRVA, slotTableBytes, $"ILT ({descriptorEntryCount} entries)"));
+                rangesToZero.Add(new ZeroRange(targetIATRVA, slotTableBytes, $"IAT ({descriptorEntryCount} entries)"));
+
+                // Zero-fill: record DLL name string
+                string dllName = File.CreateReaderAtRva(target.Name).ReadAsciiString();
+                rangesToZero.Add(new ZeroRange(target.Name, (uint)(dllName.Length + 1), $"dll-name:{dllName}"));
             }
+
+            uint index = totalImportCount;
 
             foreach (var s in Symbols.Where(s => s.IsShadowSymbol && !symbolsToWrite.Contains(s))) {
                 symbolsToWrite.Add(s);
@@ -169,10 +204,14 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                 using var ms = new MemoryStream();
                 using var writer = new BinaryWriter(ms, Encoding.UTF8);
                 foreach (var entry in importDescriptors) {
-                    if (entry.OriginalFirstThunk == targetIATRVA || entry.FirstThunk == targetILTRVA)
+                    if (targetDescriptors.Any(t => t.OriginalFirstThunk == entry.OriginalFirstThunk && t.FirstThunk == entry.FirstThunk))
                         continue;
                     entry.Write(writer);
                 }
+                // Null-terminator descriptor: Windows PE loader iterates until it hits a
+                // zero-filled IMAGE_IMPORT_DESCRIPTOR (20 bytes). Without this, the loader
+                // reads past the section and LoadLibrary fails.
+                writer.Write(new byte[20]);
                 var data = new DataSegment(ms.ToArray());
                 nidtSec.Contents = data;
                 File.Sections.Add(nidtSec);
@@ -180,6 +219,60 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
 
                 // Update import directory to point to new NIDT
                 File.OptionalHeader.SetDataDirectory(DataDirectoryIndex.ImportDirectory, new DataDirectory(nidtSec.Rva, data.GetVirtualSize()));
+            }
+
+            if (ZeroFillImports) {
+                // Cross-check: filter out any hint/name RVAs that are shared with non-target descriptors
+                HashSet<uint> sharedHintNameRvas = [];
+                foreach (var entry in importDescriptors) {
+                    if (targetDescriptors.Any(t => t.OriginalFirstThunk == entry.OriginalFirstThunk && t.FirstThunk == entry.FirstThunk))
+                        continue;
+                    var iltReader = File.CreateReaderAtRva(entry.OriginalFirstThunk);
+                    while (true) {
+                        ulong ilt = iltReader.ReadUInt64();
+                        if (ilt == 0) break;
+                        if ((ilt & 0x8000000000000000) != 0) continue;
+                        uint hnRva = (uint)(ilt & 0x7FFFFFFFFFFFFFFF);
+                        if (targetHintNameRvas.Contains(hnRva))
+                            sharedHintNameRvas.Add(hnRva);
+                    }
+                }
+
+                var filteredRanges = rangesToZero
+                    .Where(r => !(r.Purpose.StartsWith("hint+name:") && sharedHintNameRvas.Contains(r.Rva)))
+                    .ToList();
+
+                // Defer zero-fill to post-write: compute file offsets now, apply to output bytes later.
+                // This sidesteps AsmResolver's Contents replacement, which corrupts LoadLibrary.
+                File.UpdateHeaders();
+                foreach (var range in filteredRanges) {
+                    var sec = File.Sections.FirstOrDefault(s =>
+                        range.Rva >= s.Rva && (range.Rva + range.Length) <= (s.Rva + s.GetVirtualSize()));
+                    if (sec is null) {
+                        Logger.Warn($"Range 0x{range.Rva:X}+{range.Length} ({range.Purpose}) has no containing section, skipping.");
+                        continue;
+                    }
+                    uint fileOffset = (uint)sec.Offset + (range.Rva - sec.Rva);
+                    PostWriteZeros.Add((fileOffset, range.Length));
+                    Logger.Debug($"Queued post-write zero: file 0x{fileOffset:X}+0x{range.Length:X} ({range.Purpose})");
+                }
+                Logger.Info($"Queued {PostWriteZeros.Count} post-write zero range(s).");
+
+                var boundDir = File.OptionalHeader.GetDataDirectory(DataDirectoryIndex.BoundImportDirectory);
+                if (boundDir.IsPresentInPE)
+                    File.OptionalHeader.SetDataDirectory(DataDirectoryIndex.BoundImportDirectory, new DataDirectory(0, 0));
+                var delayDir = File.OptionalHeader.GetDataDirectory(DataDirectoryIndex.DelayImportDescrDirectory);
+                if (delayDir.IsPresentInPE)
+                    File.OptionalHeader.SetDataDirectory(DataDirectoryIndex.DelayImportDescrDirectory, new DataDirectory(0, 0));
+
+                // Clear the Debug data directory entry so external tools don't find CodeView/PDB info.
+                // We deliberately do NOT touch the raw bytes the directory points at: they live in .rdata
+                // adjacent to LoadConfig/CFG structures that the Windows loader actively reads, and
+                // zeroing them crashes LoadLibrary. The build-time audit in mod_build.lua fails if any
+                // RSDS or .pdb string actually appears in the output, which is the real defense.
+                // var debugDir = File.OptionalHeader.GetDataDirectory(DataDirectoryIndex.DebugDirectory);
+                // if (debugDir.IsPresentInPE)
+                //     File.OptionalHeader.SetDataDirectory(DataDirectoryIndex.DebugDirectory, new DataDirectory(0, 0));
             }
 
             File.UpdateHeaders();

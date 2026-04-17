@@ -172,14 +172,24 @@ namespace Amethyst.ModuleTweaker.Commands
                     return default;
                 }
                 Logger.Info($"Loaded module '{ModulePath}' as PE file.");
-                var patcher = new PEPatcher(peFile, [..symbols.Values], includeDebugNames);
+                var patcher = new PEPatcher(peFile, [..symbols.Values], includeDebugNames, Obfuscate);
 
                 if (patcher.Patch())
                 {
-                    File.Copy(ModulePath, ModulePath + ".bak", true);
+                    if (!Obfuscate)
+                        File.Copy(ModulePath, ModulePath + ".bak", true);
                     using var ms = new MemoryStream();
                     peFile.Write(ms);
                     var newBytes = ms.ToArray();
+                    foreach (var (off, len) in patcher.PostWriteZeros) {
+                        if (off + len > newBytes.Length) {
+                            Logger.Warn($"Post-write zero 0x{off:X}+{len} exceeds output size {newBytes.Length}, skipping.");
+                            continue;
+                        }
+                        Array.Clear(newBytes, (int)off, (int)len);
+                    }
+                    if (patcher.PostWriteZeros.Count > 0)
+                        Logger.Info($"Applied {patcher.PostWriteZeros.Count} post-write zero range(s).");
                     ulong newHash = XXH64.DigestOf(newBytes);
                     File.WriteAllBytes(ModulePath, newBytes);
                     File.WriteAllText(Path.Combine(PlatformOutput.FullName, "module_hash.txt"), newHash.ToString("X16"));
