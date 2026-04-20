@@ -158,9 +158,22 @@ namespace Amethyst.SymbolGenerator.Parsing
             // Use Mangling (singular) instead of CXXManglings to avoid crashes
             // from corrupt cursors in files with parse errors.
             string? mangled = cursor.Mangling.ToString();
-            
+
             if (string.IsNullOrEmpty(mangled))
                 mangled = "Unknown";
+
+            // MSVC ABI: clang emits the vbase destructor mangling (??_D) for CXXCursor_Destructor.
+            // MSVC-compiled callers reference the complete destructor (??1) via _Destroy_range etc.
+            // Rewrite so the generated import lib exports ??1 at the MC destructor's address.
+            if (cursor.Kind == CXCursorKind.CXCursor_Destructor && mangled.StartsWith("??_D"))
+            {
+                mangled = "??1" + mangled.Substring(4);
+                // Complete destructor mangling uses '@' in the return-type slot (no return type),
+                // whereas ??_D is an ordinary void(void) function. Rewrite QEAAXXZ → QEAA@XZ, etc.
+                int tail = mangled.LastIndexOf("AAXXZ");
+                if (tail > 0)
+                    mangled = mangled.Substring(0, tail) + "AA@XZ";
+            }
 
             MangleCache[usr] = mangled;
             return mangled;
