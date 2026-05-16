@@ -173,6 +173,28 @@ namespace Amethyst.SymbolGenerator.Parsing
                 int tail = mangled.LastIndexOf("AAXXZ");
                 if (tail > 0)
                     mangled = mangled.Substring(0, tail) + "AA@XZ";
+
+                // clang's ??_D always uses non-virtual access (Q/I/A); upgrade to virtual (U/M/E) for ??1.
+                if (cursor.CXXMethod_IsVirtual)
+                {
+                    int qualIdx = mangled.IndexOf("@@");
+                    if (qualIdx >= 0)
+                    {
+                        qualIdx += 2;
+                        if (qualIdx < mangled.Length)
+                        {
+                            char virt = mangled[qualIdx] switch
+                            {
+                                'Q' => 'U', // public  -> public virtual
+                                'I' => 'M', // protected -> protected virtual
+                                'A' => 'E', // private  -> private virtual
+                                var c => c
+                            };
+                            if (virt != mangled[qualIdx])
+                                mangled = mangled.Substring(0, qualIdx) + virt + mangled.Substring(qualIdx + 1);
+                        }
+                    }
+                }
             }
 
             MangleCache[usr] = mangled;

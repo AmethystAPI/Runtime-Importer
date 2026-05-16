@@ -3,6 +3,7 @@ using Amethyst.Common.Extensions;
 using Amethyst.Common.Models;
 using Amethyst.Common.Tracking;
 using Amethyst.Common.Utility;
+using Amethyst.SymbolGenerator.Linking;
 using Amethyst.SymbolGenerator.Parsing;
 using Amethyst.SymbolGenerator.Parsing.Annotations;
 using Amethyst.SymbolGenerator.Parsing.Annotations.Comments;
@@ -10,6 +11,7 @@ using CliFx;
 using CliFx.Attributes;
 using CliFx.Infrastructure;
 using Newtonsoft.Json;
+using System.Diagnostics;
 using System.IO;
 
 namespace Amethyst.SymbolGenerator.Commands
@@ -77,7 +79,7 @@ namespace Amethyst.SymbolGenerator.Commands
                     searchPatterns: ["*.h", "*.hpp", "*.hh", "*.hxx"],
                     filters: [.. Filters]
                 );
-                return headerTracker.TrackChanges();
+                return headerTracker.TrackChanges(retainContent: true);
             });
 
             // Separate changes into added/modified and deleted
@@ -245,47 +247,99 @@ namespace Amethyst.SymbolGenerator.Commands
                     }
                 }
 
-                // Generate output JSON files
-                foreach (var (file, data) in annotationsData)
-                {
-                    string relativePath = GetRelativePath(Inputs, file);
-                    string outputFilePath = Path.Combine(PlatformOutput.FullName, "symbols", Path.ChangeExtension(relativePath, "symbols.json"));
-                    Directory.CreateDirectory(Path.GetDirectoryName(outputFilePath)!);
-                    string json = JsonConvert.SerializeObject(new SymbolJSONModel
-                    {
-                        Functions = [.. data.OfType<FunctionSymbolModel>()],
-                        Variables = [.. data.OfType<VariableSymbolModel>()],
-                        VirtualTables = [.. data.OfType<VirtualTableSymbolModel>().DistinctBy(k => k.Name)],
-                        VirtualFunctions = [.. data.OfType<VirtualFunctionSymbolModel>()],
-                    }, Formatting.Indented, jsonSettings);
-                    File.WriteAllText(outputFilePath, json);
-                    Logger.Debug($"Generated: {outputFilePath}");
-                }
-
-                // Handle deleted files
-                foreach (var change in deleted)
-                {
-                    string relativePath = GetRelativePath(Inputs, change.FilePath);
-                    string outputFilePath = Path.Combine(PlatformOutput.FullName, "symbols", Path.ChangeExtension(relativePath, "symbols.json"));
-                    if (File.Exists(outputFilePath))
-                    {
-                        File.Delete(outputFilePath);
-                        Logger.Debug($"Deleted: {outputFilePath}");
-                    }
-                }
+                // (no per-header JSON emit; everything lives in the cache below)
             });
 
-            // Remove failed files from checksums so they get re-processed next run
-            foreach (var file in failedFiles)
+            // Load the unified symbol cache, merge this run's results in.
+            FileInfo cacheFile = new(Path.Combine(PlatformOutput.FullName, "symbol_cache.json"));
+            SymbolCache cache = Utils.Benchmark<SymbolCache>("Load symbol cache", () => SymbolCache.Load(cacheFile));
+            bool cacheDirty = false;
+
+            foreach (var (file, data) in annotationsData)
             {
-                string normalized = file.Replace('\\', '/');
-                var key = checksums.Keys.FirstOrDefault(k => k.Replace('\\', '/').Equals(normalized, StringComparison.OrdinalIgnoreCase));
-                if (key is not null)
-                    checksums.Remove(key);
+                cache.Entries[file] = new SymbolJSONModel
+                {
+                    Functions = [.. data.OfType<FunctionSymbolModel>()],
+                    Variables = [.. data.OfType<VariableSymbolModel>()],
+                    VirtualTables = [.. data.OfType<VirtualTableSymbolModel>().DistinctBy(k => k.Name)],
+                    VirtualFunctions = [.. data.OfType<VirtualFunctionSymbolModel>()],
+                };
+                cacheDirty = true;
             }
 
+            foreach (var change in deleted)
+            {
+                if (cache.Entries.Remove(change.FilePath))
+                    cacheDirty = true;
+            }
+
+            if (cacheDirty)
+                Utils.Benchmark("Save symbol cache", () => cache.Save(cacheFile));
+
+            // Build the lib (inline; replaces the separate LibraryGenerator process).
+            Utils.Benchmark("Generate library", () => GenerateLibrary(PlatformOutput, cache, cacheDirty));
+
+            // Keep failed files in checksums; they'll be retried when their content actually changes.
             headerTracker.SaveChecksums(checksums);
             return default;
+        }
+
+        private void GenerateLibrary(DirectoryInfo platformOutput, SymbolCache cache, bool cacheDirty)
+        {
+            // Union of all mangled names across cache + pregenerated.symbols.json overrides.
+            HashSet<string> allMangledNames = [];
+            foreach (var entry in cache.Entries.Values)
+            {
+                foreach (var f in entry.Functions) if (!string.IsNullOrEmpty(f.Name)) allMangledNames.Add(f.Name);
+                foreach (var v in entry.Variables) if (!string.IsNullOrEmpty(v.Name)) allMangledNames.Add(v.Name);
+                foreach (var vf in entry.VirtualFunctions) if (!string.IsNullOrEmpty(vf.Name)) allMangledNames.Add(vf.Name);
+            }
+
+            // Pregen file (rare, hand-curated symbols the auto-extractor can't reach).
+            string pregenPath = Path.Combine(platformOutput.FullName, "symbols", "pregenerated.symbols.json");
+            if (File.Exists(pregenPath))
+            {
+                var pre = JsonConvert.DeserializeObject<SymbolJSONModel>(File.ReadAllText(pregenPath));
+                if (pre is not null)
+                {
+                    foreach (var f in pre.Functions) if (!string.IsNullOrEmpty(f.Name)) allMangledNames.Add(f.Name);
+                    foreach (var v in pre.Variables) if (!string.IsNullOrEmpty(v.Name)) allMangledNames.Add(v.Name);
+                    foreach (var vf in pre.VirtualFunctions) if (!string.IsNullOrEmpty(vf.Name)) allMangledNames.Add(vf.Name);
+                }
+            }
+
+            // Skip the (slow) lib.exe invocations when nothing actually changed AND a lib already exists.
+            string[] existingLibs = Directory.Exists(platformOutput.FullName)
+                ? [.. Directory.EnumerateFiles(platformOutput.FullName, "Minecraft.Windows.*.lib")]
+                : [];
+            if (!cacheDirty && existingLibs.Length > 0)
+            {
+                Logger.Debug("Symbol cache unchanged and a lib already exists, skipping lib.exe.");
+                return;
+            }
+
+            // Clear old chunked artifacts.
+            foreach (var f in Directory.EnumerateFiles(platformOutput.FullName, "Minecraft.Windows.*.def")) File.Delete(f);
+            foreach (var f in existingLibs) File.Delete(f);
+
+            int index = 0;
+            List<Process> libProcs = [];
+            foreach (var chunk in allMangledNames.ChunkBy(65500))
+            {
+                string defFilePath = Path.Combine(platformOutput.FullName, $"Minecraft.Windows.{index}.def");
+                string libFilePath = Path.Combine(platformOutput.FullName, $"Minecraft.Windows.{index}.lib");
+                Utils.CreateDefinitionFile(defFilePath, chunk);
+                libProcs.Add(Lib.GenerateLib(defFilePath, libFilePath));
+                index++;
+            }
+
+            for (int i = 0; i < libProcs.Count; i++)
+            {
+                libProcs[i].WaitForExit();
+                if (libProcs[i].ExitCode != 0)
+                    Logger.Fatal($"lib.exe failed on chunk {i}, output: {libProcs[i].StandardError.ReadToEnd()}");
+                File.Delete(Path.Combine(platformOutput.FullName, $"Minecraft.Windows.{i}.exp"));
+            }
         }
     }
 }

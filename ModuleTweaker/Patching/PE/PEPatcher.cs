@@ -119,7 +119,7 @@ namespace Amethyst.ModuleTweaker.Patching.PE {
                     importNameToTarget[name] = entryRVA;
                     symbol.TargetOffset = entryRVA;
                     symbolsToWrite.Add(symbol);
-                    Logger.Debug($"Mapping import {name} to target RVA 0x{entryRVA:X}...");
+                    Logger.Info($"Mapping import {name} to target RVA 0x{entryRVA:X}...");
                 }
 
                 // Zero-fill: record ILT and IAT slot ranges (entries + 8-byte null terminator)

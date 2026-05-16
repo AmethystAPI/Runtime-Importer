@@ -54,8 +54,9 @@ namespace Amethyst.ModuleTweaker.Commands
             }
 
             DirectoryInfo PlatformSymbolInput = new(Path.Combine(PlatformInput.FullName, "symbols"));
-            if (PlatformSymbolInput.Exists is false) {
-                Logger.Warn($"Couldn't patch module, platform-specific symbols directory '{PlatformSymbolInput.FullName}' does not exist.");
+            FileInfo symbolCacheFile = new(Path.Combine(PlatformInput.FullName, "symbol_cache.json"));
+            if (!symbolCacheFile.Exists && !PlatformSymbolInput.Exists) {
+                Logger.Warn($"Couldn't patch module, neither '{symbolCacheFile.FullName}' nor '{PlatformSymbolInput.FullName}' exist.");
                 return default;
             }
 
@@ -92,25 +93,37 @@ namespace Amethyst.ModuleTweaker.Commands
 
             bool includeDebugNames = !Obfuscate;
 
-            // Collect all symbol files and accumulate mangled names
-            IEnumerable<FileInfo> symbolFiles = PlatformSymbolInput
-                .EnumerateFiles("*.symbols.json", SearchOption.AllDirectories)
-                .Where(f => Path.GetFileName(f.FullName) != "pregenerated.symbols.json" && Path.GetFileName(f.FullName) != "template.pregenerated.symbols.json");
+            // Collect all symbol models: unified cache (preferred) + pregenerated overrides.
+            List<SymbolJSONModel> symbolModels = [];
+
+            if (symbolCacheFile.Exists)
+            {
+                var cache = SymbolCache.Load(symbolCacheFile);
+                symbolModels.AddRange(cache.Entries.Values);
+            }
+            else if (PlatformSymbolInput.Exists)
+            {
+                // Legacy path: per-header *.symbols.json files (kept for backwards compat).
+                foreach (var symbolFile in PlatformSymbolInput.EnumerateFiles("*.symbols.json", SearchOption.AllDirectories)
+                    .Where(f => Path.GetFileName(f.FullName) != "pregenerated.symbols.json" && Path.GetFileName(f.FullName) != "template.pregenerated.symbols.json"))
+                {
+                    var model = JsonConvert.DeserializeObject<SymbolJSONModel>(File.ReadAllText(symbolFile.FullName));
+                    if (model is not null) symbolModels.Add(model);
+                }
+            }
 
             string pregeneratedPath = PregeneratedSymbolsPath is null ?
                 Path.Combine(PlatformSymbolInput.FullName, "pregenerated.symbols.json") :
                 PregeneratedSymbolsPath;
-            if (File.Exists(pregeneratedPath)) {
-                symbolFiles = symbolFiles.Prepend(new FileInfo(pregeneratedPath));
+            if (File.Exists(pregeneratedPath))
+            {
+                var pre = JsonConvert.DeserializeObject<SymbolJSONModel>(File.ReadAllText(pregeneratedPath));
+                if (pre is not null) symbolModels.Insert(0, pre);
             }
 
             Dictionary<string, AbstractSymbol> symbols = [];
-            foreach (var symbolFile in symbolFiles)
+            foreach (var symbolJson in symbolModels)
             {
-                using var stream = symbolFile.OpenRead();
-                using var sr = new StreamReader(stream);
-                SymbolJSONModel? symbolJson = JsonConvert.DeserializeObject<SymbolJSONModel>(sr.ReadToEnd());
-                if (symbolJson is not null)
                 {
                     foreach (var function in symbolJson.Functions) {
                         if (string.IsNullOrEmpty(function.Name))
