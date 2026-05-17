@@ -26,12 +26,6 @@ namespace Amethyst.Common.Tracking
         public string[] SearchPatterns { get; private set; }
         public string[] Filters { get; private set; }
 
-        // mtime/size fast-path: skip hashing when both match the last-seen values.
-        private Dictionary<string, FastPathEntry> _fastPath = [];
-        private readonly FileInfo _fastPathFile;
-
-        private record FastPathEntry(long Mtime, long Size, ulong Hash);
-
         public FileTracker(DirectoryInfo[] inputDirectories, FileInfo checksumFile, string[] searchPatterns, string[] filters)
         {
             ArgumentNullException.ThrowIfNull(inputDirectories);
@@ -48,8 +42,6 @@ namespace Amethyst.Common.Tracking
             ChecksumFile = checksumFile;
             SearchPatterns = searchPatterns;
             Filters = filters;
-            _fastPathFile = new FileInfo(Path.ChangeExtension(checksumFile.FullName, ".fastpath.json"));
-            LoadFastPath();
         }
 
         /// <summary>
@@ -103,7 +95,6 @@ namespace Amethyst.Common.Tracking
 
             ConcurrentBag<FileChange> changes = [];
             ConcurrentDictionary<string, ulong> newChecksums = new(StringComparer.OrdinalIgnoreCase);
-            ConcurrentDictionary<string, FastPathEntry> newFastPath = new(StringComparer.OrdinalIgnoreCase);
 
 #if DEBUG
             // In debug mode, treat all files as modified to simplify testing.
@@ -116,26 +107,9 @@ namespace Amethyst.Common.Tracking
             Parallel.ForEach(files, file =>
             {
                 string filePath = file.FullName.NormalizeSlashes();
-                long mtime = file.LastWriteTimeUtc.Ticks;
-                long size = file.Length;
-
-                // Fast path: mtime+size match → reuse cached hash, no read needed.
-                if (_fastPath.TryGetValue(filePath, out var fp) && fp.Mtime == mtime && fp.Size == size)
-                {
-                    newChecksums[filePath] = fp.Hash;
-                    newFastPath[filePath] = fp;
-                    if (!lastChecksums.TryGetValue(filePath, out var lastHash))
-                        changes.Add(new FileChange(ChangeType.Added, filePath));
-                    else if (lastHash != fp.Hash)
-                        changes.Add(new FileChange(ChangeType.Modified, filePath));
-                    return;
-                }
-
-                // Slow path: read + hash.
                 byte[] bytes = File.ReadAllBytes(file.FullName);
                 ulong hash = XXH64.DigestOf(bytes, 0, bytes.Length);
                 newChecksums[filePath] = hash;
-                newFastPath[filePath] = new FastPathEntry(mtime, size, hash);
 
                 if (!lastChecksums.TryGetValue(filePath, out var lh))
                 {
@@ -151,8 +125,6 @@ namespace Amethyst.Common.Tracking
                 }
             });
 #endif
-
-            _fastPath = new Dictionary<string, FastPathEntry>(newFastPath, StringComparer.OrdinalIgnoreCase);
 
             // Check for deleted files
             foreach (var lastFile in lastChecksums.Keys)
@@ -186,23 +158,6 @@ namespace Amethyst.Common.Tracking
                 throw new Exception("Failed to get directory name for checksum file.");
             Directory.CreateDirectory(checksumDirectory);
             File.WriteAllText(ChecksumFile.FullName, json);
-            SaveFastPath();
-        }
-
-        private void LoadFastPath()
-        {
-            if (!_fastPathFile.Exists) return;
-            try
-            {
-                _fastPath = JsonConvert.DeserializeObject<Dictionary<string, FastPathEntry>>(File.ReadAllText(_fastPathFile.FullName))
-                    ?? new Dictionary<string, FastPathEntry>(StringComparer.OrdinalIgnoreCase);
-            }
-            catch { _fastPath = []; }
-        }
-
-        private void SaveFastPath()
-        {
-            File.WriteAllText(_fastPathFile.FullName, JsonConvert.SerializeObject(_fastPath, Formatting.None));
         }
     }
 }
