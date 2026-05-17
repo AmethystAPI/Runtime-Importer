@@ -114,13 +114,13 @@ namespace Amethyst.Common.Tracking
                 if (!lastChecksums.TryGetValue(filePath, out var lh))
                 {
                     var fc = new FileChange(ChangeType.Added, filePath);
-                    if (retainContent) fc.Content = System.Text.Encoding.UTF8.GetString(bytes);
+                    if (retainContent) fc.Content = DecodeAndStripBom(bytes);
                     changes.Add(fc);
                 }
                 else if (lh != hash)
                 {
                     var fc = new FileChange(ChangeType.Modified, filePath);
-                    if (retainContent) fc.Content = System.Text.Encoding.UTF8.GetString(bytes);
+                    if (retainContent) fc.Content = DecodeAndStripBom(bytes);
                     changes.Add(fc);
                 }
             });
@@ -134,6 +134,16 @@ namespace Amethyst.Common.Tracking
             }
 
             return (changes.ToArray(), new Dictionary<string, ulong>(newChecksums, StringComparer.OrdinalIgnoreCase));
+        }
+
+        // Encoding.UTF8.GetString preserves an optional UTF-8 BOM as a ﻿ char,
+        // which then breaks downstream regexes anchored at ^ (\s does not match BOM
+        // in .NET). Strip the BOM here so retained content matches what File.ReadAllText
+        // would have returned.
+        private static string DecodeAndStripBom(byte[] bytes)
+        {
+            int offset = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF ? 3 : 0;
+            return System.Text.Encoding.UTF8.GetString(bytes, offset, bytes.Length - offset);
         }
 
         public Dictionary<string, ulong> LoadChecksums()
