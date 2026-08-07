@@ -267,10 +267,35 @@ namespace Amethyst.SymbolGenerator.Commands
                 cacheDirty = true;
             }
 
+            // A header that reparsed to NO symbols must have its entry cleared.
+            // Only files that produced symbols appear in annotationsData, so
+            // without this a header that lost its last `MC` declaration keeps
+            // exporting the previous set indefinitely. Files whose parse failed
+            // are left alone — their prior symbols are still the best we have.
+            foreach (FileChange change in addedOrModified)
+            {
+                string path = Path.GetFullPath(change.FilePath).NormalizeSlashes();
+                if (failedFiles.Contains(path) || annotationsData.ContainsKey(path)) continue;
+                if (cache.Entries.Remove(path))
+                    cacheDirty = true;
+            }
+
             foreach (var change in deleted)
             {
                 if (cache.Entries.Remove(change.FilePath))
                     cacheDirty = true;
+            }
+
+            // `deleted` is change-tracking derived, so it is empty whenever the
+            // checksum baseline was reset — the cache would then keep exporting
+            // symbols for headers that no longer exist. Existence on disk is the
+            // real invariant: a symbol is only importable from a header we still
+            // have, so drop entries whose file is gone regardless of tracking.
+            foreach (string cachedFile in cache.Entries.Keys.ToList())
+            {
+                if (cachedFile == "<unknown>" || File.Exists(cachedFile)) continue;
+                cache.Entries.Remove(cachedFile);
+                cacheDirty = true;
             }
 
             if (cacheDirty)
@@ -279,7 +304,10 @@ namespace Amethyst.SymbolGenerator.Commands
             // Build the lib (inline; replaces the separate LibraryGenerator process).
             Utils.Benchmark("Generate library", () => GenerateLibrary(PlatformOutput, cache, cacheDirty));
 
-            // Keep failed files in checksums; they'll be retried when their content actually changes.
+            // A header can fail because another generated header was temporarily invalid. Do not
+            // mark it as processed: its own bytes may never change after that dependency is fixed.
+            foreach (string failedFile in failedFiles)
+                checksums.Remove(Path.GetFullPath(failedFile).NormalizeSlashes());
             headerTracker.SaveChecksums(checksums);
             return default;
         }

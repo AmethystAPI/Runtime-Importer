@@ -165,34 +165,42 @@ namespace Amethyst.SymbolGenerator.Parsing
             // MSVC ABI: clang emits the vbase destructor mangling (??_D) for CXXCursor_Destructor.
             // MSVC-compiled callers reference the complete destructor (??1) via _Destroy_range etc.
             // Rewrite so the generated import lib exports ??1 at the MC destructor's address.
-            if (cursor.Kind == CXCursorKind.CXCursor_Destructor && mangled.StartsWith("??_D"))
+            if (cursor.Kind == CXCursorKind.CXCursor_Destructor)
             {
-                mangled = "??1" + mangled.Substring(4);
-                // Complete destructor mangling uses '@' in the return-type slot (no return type),
-                // whereas ??_D is an ordinary void(void) function. Rewrite QEAAXXZ → QEAA@XZ, etc.
-                int tail = mangled.LastIndexOf("AAXXZ");
-                if (tail > 0)
-                    mangled = mangled.Substring(0, tail) + "AA@XZ";
-
-                // clang's ??_D always uses non-virtual access (Q/I/A); upgrade to virtual (U/M/E) for ??1.
-                if (cursor.CXXMethod_IsVirtual)
+                if (mangled.StartsWith("??_D"))
                 {
-                    int qualIdx = mangled.IndexOf("@@");
-                    if (qualIdx >= 0)
+                    mangled = "??1" + mangled.Substring(4);
+                    // Complete destructor mangling uses '@' in the return-type slot (no return type),
+                    // whereas ??_D is an ordinary void(void) function. Rewrite QEAAXXZ → QEAA@XZ, etc.
+                    int tail = mangled.LastIndexOf("AAXXZ");
+                    if (tail > 0)
+                        mangled = mangled.Substring(0, tail) + "AA@XZ";
+                }
+
+                // Virtual destructor body manglings should carry virtual access (U/M/E) in the
+                // qualifier slot, but clang emits non-virtual access (Q/I/A) — both when rewriting
+                // ??_D above and when emitting ??1 directly for class template specializations.
+                // Upgrade after the fact so consumers' `delete this` calls link properly.
+                //
+                // The access modifier is the character immediately preceding the destructor
+                // suffix `EAA@XZ` (E=member, A=non-cv, A=__cdecl, @=no-return-marker, XZ=void
+                // params). Can't just search for the FIRST `@@` because templated names contain
+                // intra-name `@@` sequences (e.g. `dragon@@@mce@@` in ResourcePointer<X>).
+                if (cursor.CXXMethod_IsVirtual && mangled.StartsWith("??1"))
+                {
+                    int suffixIdx = mangled.LastIndexOf("EAA@XZ");
+                    if (suffixIdx >= 1)
                     {
-                        qualIdx += 2;
-                        if (qualIdx < mangled.Length)
+                        int qualIdx = suffixIdx - 1;
+                        char virt = mangled[qualIdx] switch
                         {
-                            char virt = mangled[qualIdx] switch
-                            {
-                                'Q' => 'U', // public  -> public virtual
-                                'I' => 'M', // protected -> protected virtual
-                                'A' => 'E', // private  -> private virtual
-                                var c => c
-                            };
-                            if (virt != mangled[qualIdx])
-                                mangled = mangled.Substring(0, qualIdx) + virt + mangled.Substring(qualIdx + 1);
-                        }
+                            'Q' => 'U', // public  -> public virtual
+                            'I' => 'M', // protected -> protected virtual
+                            'A' => 'E', // private  -> private virtual
+                            var c => c
+                        };
+                        if (virt != mangled[qualIdx])
+                            mangled = mangled.Substring(0, qualIdx) + virt + mangled.Substring(qualIdx + 1);
                     }
                 }
             }
@@ -433,9 +441,6 @@ namespace Amethyst.SymbolGenerator.Parsing
                             variables.Add(cached);
                             return CXChildVisitResult.CXChildVisit_Continue;
                         }
-
-                        if (cursor.Linkage == CXLinkageKind.CXLinkage_External && cursor.Language == CXLanguageKind.CXLanguage_C)
-                            return CXChildVisitResult.CXChildVisit_Continue;
 
                         var (result, variable) = VisitVariable(cursor, parent, usr);
                         if (variable is not null)

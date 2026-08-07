@@ -17,7 +17,9 @@ namespace Amethyst.Common.Tracking
             get
             {
                 Version version = AssemblyVersion;
-                return (ulong)((version.Major << 32) | (version.Minor << 16) | version.Build);
+                return ((ulong)(uint)version.Major << 32)
+                    | ((ulong)(uint)version.Minor << 16)
+                    | (uint)version.Build;
             }
         }
 
