@@ -203,6 +203,15 @@ namespace Amethyst.ModuleTweaker.Commands
                     }
                     if (patcher.PostWriteZeros.Count > 0)
                         Logger.Info($"Applied {patcher.PostWriteZeros.Count} post-write zero range(s).");
+
+                    // The debug directory stores both an RVA and a file offset for its data. Rewriting
+                    // the module moves sections in the file, so the recorded file offset goes stale
+                    // while the RVA stays right. Debuggers read the file offset, find whatever now
+                    // lives there, and fall back to export symbols -- which is why a crash dump of a
+                    // patched module has no function names. Only the pointer is corrected here; the
+                    // data it names is untouched, and a module built without a PDB has no entry to
+                    // correct.
+                    FixDebugDirectoryPointers(newBytes);
                     ulong newHash = XXH64.DigestOf(newBytes);
                     File.WriteAllBytes(ModulePath, newBytes);
                     File.WriteAllText(Path.Combine(PlatformOutput.FullName, "module_hash.txt"), newHash.ToString("X16"));
@@ -214,6 +223,59 @@ namespace Amethyst.ModuleTweaker.Commands
                 return default;
             }
             return default;
+        }
+
+        /// Recompute IMAGE_DEBUG_DIRECTORY PointerToRawData from AddressOfRawData against the
+        /// written file's own section table, and log how many entries needed correcting.
+        private static void FixDebugDirectoryPointers(byte[] image) {
+            uint U32(int at) => BitConverter.ToUInt32(image, at);
+            ushort U16(int at) => BitConverter.ToUInt16(image, at);
+
+            int peOffset = (int)U32(0x3C);
+            if (peOffset <= 0 || peOffset + 24 > image.Length) return;
+
+            int sectionCount = U16(peOffset + 6);
+            int optionalSize = U16(peOffset + 20);
+            int optionalOffset = peOffset + 24;
+            bool pe32Plus = U16(optionalOffset) == 0x20B;
+            int dataDirOffset = optionalOffset + (pe32Plus ? 112 : 96);
+
+            uint debugRva = U32(dataDirOffset + 6 * 8);
+            uint debugSize = U32(dataDirOffset + 6 * 8 + 4);
+            if (debugRva == 0 || debugSize < 28) return;
+
+            int sectionOffset = optionalOffset + optionalSize;
+            int? OffsetOf(uint rva) {
+                for (int i = 0; i < sectionCount; i++) {
+                    int s = sectionOffset + i * 40;
+                    uint virtualSize = U32(s + 8);
+                    uint virtualAddress = U32(s + 12);
+                    uint rawSize = U32(s + 16);
+                    uint rawPointer = U32(s + 20);
+                    uint span = Math.Max(virtualSize, rawSize);
+                    if (rva >= virtualAddress && rva < virtualAddress + span)
+                        return (int)(rawPointer + (rva - virtualAddress));
+                }
+                return null;
+            }
+
+            int? debugOffset = OffsetOf(debugRva);
+            if (debugOffset is null) return;
+
+            int corrected = 0;
+            for (int i = 0; i < debugSize / 28; i++) {
+                int entry = debugOffset.Value + i * 28;
+                if (entry + 28 > image.Length) break;
+                uint addressOfRawData = U32(entry + 20);
+                if (addressOfRawData == 0) continue;
+                int? expected = OffsetOf(addressOfRawData);
+                if (expected is null) continue;
+                if (U32(entry + 24) == (uint)expected.Value) continue;
+                BitConverter.GetBytes((uint)expected.Value).CopyTo(image, entry + 24);
+                corrected++;
+            }
+            if (corrected > 0)
+                Logger.Info($"Corrected {corrected} stale debug directory file offset(s).");
         }
     }
 }
